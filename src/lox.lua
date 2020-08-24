@@ -13,6 +13,41 @@ local strlen, strsub, strmatch, strgmatch = string.len, string.sub, string.match
 local strrep, strgsub, strfind = string.rep, string.gsub, string.find
 local tinsert, tremove, tconcat = table.insert, table.remove, table.concat
 
+local function _xpath (doc, path) -- {{{ return doc/xml-node table, missingTag
+    if (not path) or path == '' or #doc == 0 then return doc, path end
+    -- NB: xpointer does not have standard treatment -- A/B, /A/B[@attr="val",@bb='4']
+
+    local tag, attr
+    tag, path = strmatch(path, '([^/]+)(.*)$')
+    tag, attr = strmatch(tag, '([^%[]+)%[?([^%]]*)')
+    attr = str2tbl(attr)
+    local idx = tonumber(attr[#attr]) -- idx: []/all, [-]/last, [0]/merged, [+]/first
+    local xn = {} -- xml-node (doc)
+    repeat -- collect along the metatable (if mode is defined)
+        for i = 1, #doc do -- no metatable
+            local mt = doc[i]
+            if type(mt) == 'table' and mt['.'] == tag and btx.matchtbl(mt, attr) then
+                if idx and idx < 0 then xn[1] = nil end -- clean up
+                if path ~= '' or idx == 0 then
+                    repeat -- collect along the metatable (NB: ipairs will dupe metatable)
+                        for j = 1, #mt do if type(mt[j]) == 'table' or path == '' then tinsert(xn, mt[j]) end end
+                        mt = getmetatable(mt)
+                        if mt then mt = mt.__index end
+                    until not mt
+                else
+                    tinsert(xn, mt)
+                end
+                if idx and idx > 0 then break end
+            end
+        end
+        if idx and idx > 0 and #xn > 0 then break end
+        doc = getmetatable(doc)
+        if doc then doc = doc.index end
+    until not doc
+    if path == '' and idx == 0 then xn['.'] = tag; xn = {xn} end
+    return _xpath(xn, path)
+end -- }}}
+
 local Lox = class { -- {{{ Lua Objective Xml
     doc = false; -- node
 
@@ -103,40 +138,7 @@ local Lox = class { -- {{{ Lua Objective Xml
         return (fxml == 1 and '' or '<?xml version="1.0" encoding="UTF-8"?>\n')..tconcat(res, '\n')
     end; -- }}}
 
-    xpath = function (o, doc, path) -- {{{ return doc/xml-node table, missingTag
-        if (not path) or path == '' or #doc == 0 then return doc, path end
-        -- NB: xpointer does not have standard treatment -- A/B, /A/B[@attr="val",@bb='4']
-
-        local tag, attr
-        tag, path = strmatch(path, '([^/]+)(.*)$')
-        tag, attr = strmatch(tag, '([^%[]+)%[?([^%]]*)')
-        attr = str2tbl(attr)
-        local idx = tonumber(attr[#attr]) -- idx: []/all, [-]/last, [0]/merged, [+]/first
-        local xn = {} -- xml-node (doc)
-        repeat -- collect along the metatable (if mode is defined)
-            for i = 1, #doc do -- no metatable
-                local mt = doc[i]
-                if type(mt) == 'table' and mt['.'] == tag and btx.matchtbl(mt, attr) then
-                    if idx and idx < 0 then xn[1] = nil end -- clean up
-                    if path ~= '' or idx == 0 then
-                        repeat -- collect along the metatable (NB: ipairs will dupe metatable)
-                            for j = 1, #mt do if type(mt[j]) == 'table' or path == '' then tinsert(xn, mt[j]) end end
-                            mt = getmetatable(mt)
-                            if mt then mt = mt.__index end
-                        until not mt
-                    else
-                        tinsert(xn, mt)
-                    end
-                    if idx and idx > 0 then break end
-                end
-            end
-            if idx and idx > 0 and #xn > 0 then break end
-            doc = getmetatable(doc)
-            if doc then doc = doc.index end
-        until not doc
-        if path == '' and idx == 0 then xn['.'] = tag; xn = {xn} end
-        return o:xpath(xn, path)
-    end; -- }}}
+    xpath = function (o, path) return class:new(o, (_xpath(o.doc[1], path))) end; -- return node table, missingTag
 
     ['<'] = function (o, assign, trim) -- {{{
         if type(assign) == 'table' then o.doc = assign; return end
@@ -207,7 +209,7 @@ local Lox = class { -- {{{ Lua Objective Xml
                 end -- }}}
 
                 if not doctree[link] then buildLnk(ParseXml(link), link) end
-                link, xpath = o:xpath(doctree[link], strmatch(xpath or '', '#xpointer%((.*)%)'))
+                link, xpath = _xpath(doctree[link], strmatch(xpath or '', '#xpointer%((.*)%)'))
 
                 if #link == 1 then -- the linked table
                     local meta = link[1]
