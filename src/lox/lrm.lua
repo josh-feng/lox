@@ -1,6 +1,6 @@
 #!/usr/bin/env lua
 -- ======================================================================== --
--- Lua RML-object Model
+-- Lua Objective RML (LOR)
 -- Usage example:
 --      lrm = require('lrm')
 --      doc = lrm.ParseRml(file)
