@@ -87,7 +87,7 @@ local Lox = class { -- {{{ Lua Objective Xml
         return o
     end;
 
-    dump = function (o, indent) -- {{{ -0/none, +/indent
+    dump = function (o, indent, txtwidth) -- {{{ -0/none, +/indent
 
         local xmlstr = function (s, fenc) -- {{{
             -- encode: gzip -c | base64 -w 128
@@ -123,7 +123,7 @@ local Lox = class { -- {{{ Lua Objective Xml
             if #node == 0 then return res..' />' end
             res = {res..'>'}
             for i = 1, #node do tinsert(res, dumpLox(node[i]) or nil) end
-            if #res == 2 and #(res[2]) < 100 and not strfind(res[2], '\n') then
+            if #res == 2 and (txtwidth <= 0 or #(res[2]) < txtwidth) and not strfind(res[2], '\n') then
                 return res[1]..res[2]..'</'..node['.']..'>'
             end
             return indent
@@ -133,6 +133,7 @@ local Lox = class { -- {{{ Lua Objective Xml
 
         indent = tonumber(indent) or 2 -- 0: no indentation
         indent = indent > 0 and strrep(' ', indent)
+        txtwidth = tonumber(txtwidth) or 200
         local res = {}
         for _, doc in ipairs(o.doc) do tinsert(res, dumpLox(doc) or nil) end
         return (fxml == 1 and '' or '<?xml version="1.0" encoding="UTF-8"?>\n')..tconcat(res, '\n')

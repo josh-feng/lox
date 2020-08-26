@@ -34,8 +34,8 @@ build = {
        lua = {
            lox = "src/lox.lua", -- lox
            ['lox.btx'] = "src/btx.lua", -- btx
-           ['lox.lrm'] = "src/lrm.lua", -- rml object model
-           ['lox.lrps'] = "src/lrps.lua", -- rml parser
+           -- ['lox.lrm'] = "src/lrm.lua", -- rml object model
+           -- ['lox.lrps'] = "src/lrps.lua", -- rml parser
        },
    },
    copy_directories = {"doc", "test"}
