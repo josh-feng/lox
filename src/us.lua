@@ -2,14 +2,13 @@
 -- ================================================================== --
 -- useful stuff (us:utility subroutine) on top of 'posix' module
 -- ================================================================== --
-local we = {id = ''} -- version control
+local we = {stamp = false} -- working environment
 
 local strgsub, strsub, strgmatch, strmatch, strfind =
     string.gsub, string.sub, string.gmatch, string.match, string.find
 local tinsert, tremove, tconcat, tsort =
     table.insert, table.remove, table.concat, table.sort
 
-we.stamp = false
 local Log
 
 we.log = function (logfile) -- {{{ initially no log file: log('logfile')
@@ -148,12 +147,6 @@ we.split = function (str, sep) -- {{{ split string w/ ':' into a table
     sep = sep or ':'
     for o in strgmatch(str..sep, '([^'..sep..']-)'..sep) do tinsert(t, o) end
     return t
-end -- }}}
-
-we.strcut = function (str, sep) -- {{{ cut string w/ '-' into 2 parts
-    if type(str) ~= 'string' then return end
-    local f1, rest = strmatch(str, '^([^%'..(sep or '-')..']+)(.*)')
-    return f1, (#rest > 0) and strsub(rest, 2, -1) or nil
 end -- }}}
 
 local pm = '().+-*?[^$' -- need to put % first
@@ -356,15 +349,6 @@ end -- }}}
 -- ================================================================== --
 -- =====================  TABLES FUNCTIONS  ========================= --
 -- ================================================================== --
-we.tappi = function (src, targ) -- {{{ append src table to targ table
-    local t = type(targ) == 'table' and targ or {}
-    if type(src) == 'table' then
-        for _, v in ipairs(src) do tinsert(t, v) end
-    elseif type(src) then
-        tinsert(t, src)
-    end
-    return t
-end -- }}}
 we.traceTbl = function (tbl, testkey, procvalue, ...) -- {{{ table trace
     for k, v in pairs(tbl) do
         if testkey(k) then
