@@ -1,7 +1,7 @@
 #!/usr/bin/env lua
 -- ================================================================== --
--- Lua Object Model: on top of 'lxp'
--- DOM: tbm = {['.'] = tag; ['@'] = {}; ['&'] = {{}..}; {'comment'}, ...}
+-- LOM (Lua Object Model): on top of 'lxp'
+-- DOM: doc = {['.'] = tag; ['@'] = {}; ['&'] = {{}..}; '\0comment', ...}
 -- Usage example:
 --      lom = require('lom')
 --      doc = lom(xmlfile or '')
@@ -11,14 +11,12 @@
 -- ================================================================== --
 local lxp = require('lxp') -- the standard Lua Expat module
 local class = require('pool') -- https://github.com/josh-feng/pool.git
-local we = require('us') -- https://github.com/josh-feng/lox.git
+local we = require('us') -- working environment
 
 local next, assert, type = next, assert, type
 local strlen, strsub, strmatch, strgmatch = string.len, string.sub, string.match, string.gmatch
 local strrep, strgsub, strfind = string.rep, string.gsub, string.find
 local tinsert, tremove, tconcat = table.insert, table.remove, table.concat
--- ================================================================== --
--- LOM (Lua Object Model)
 -- ================================================================== --
 local docs = {} -- xml object list (hidden upvalue)
 
@@ -45,16 +43,16 @@ local function text (p, txt) -- {{{
 end -- }}}
 local function comment (p, txt) -- {{{
     local stack = p:getcallbacks().stack
-    tinsert(stack[#stack], {txt})
+    tinsert(stack[#stack], '\0'..txt)
 end -- }}}
 
 local function parse (o, txt) -- friend function {{{
-    local p = o['*']
+    local p = o[0]
     local status, msg, line, col, pos = p:parse(txt) -- pass nil if failed
     if not (txt and status) then
         if not status then o['?'] = {msg..' #'..line} end
         p:close() -- seems destroy the lxp obj
-        o['*'] = nil
+        o[0] = nil
         o.parse = nil
     end
     return o -- for cascade oop
@@ -141,8 +139,9 @@ local function xmlstr (s, fenc) -- {{{
 end -- }}}
 
 local function dumpLom (node) -- {{{
-    if 'string' == type(node) then return node end
-    if not node['.'] then return node[1] and '<!--'..node[1]..'-->' end
+    if 'string' == type(node) then
+        return strsub(node, 1, 1) ~= '\0' and node or '<!--'..node..'-->'
+    end
     local res = {}
     if node['@'] then
         for _, k in ipairs(node['@']) do tinsert(res, k..'="'..strgsub(node['@'][k], '"', '\\"')..'"') end
@@ -157,18 +156,18 @@ local function dumpLom (node) -- {{{
     return strgsub(tconcat(res, '\n'), '\n', '\n  ')..'\n</'..node['.']..'>' -- indent 2
 end -- }}}
 
-local dom = class { -- lua document object model
+local dom = class { -- lua document object model {{{
     ['.'] = false; -- tag name
     ['@'] = false; -- attr
     ['&'] = false; -- xlink table
-    ['#'] = false; -- stamp
     ['?'] = false; -- errors
     ['*'] = false; -- module
-    ['+'] = false; -- data array
 
     ['<'] = function (o, spec, mode) --{{{
-        if type(spec) == 'table' then -- partial table-tree
-            for k, v in pairs(spec) do o[k] = v end
+        if type(spec) == 'table' then -- partial table-tree (0: data/stamp)
+            for k, v in pairs(spec) do
+                if k ~= 0 then o[k] = v end -- new data setting
+            end
         elseif type(spec) == 'string' then -- '' for text
             local p = lxp.new {
                 StartElement = starttag,
@@ -180,7 +179,7 @@ local dom = class { -- lua document object model
             }
 
             if spec == '' then
-                o['*'] = p
+                o[0] = p
                 o.parse = parse
             else
                 local file, msg = io.open(spec, 'r')
@@ -202,7 +201,7 @@ local dom = class { -- lua document object model
         end
     end; --}}}
 
-    ['>'] = function (o) for i = 1, #o do o[i] = nil end end;
+    ['>'] = function (o) for i = 0, #o do o[i] = nil end end;
 
     parse = false; -- implemented in friend function
 
@@ -222,67 +221,11 @@ local dom = class { -- lua document object model
         return tconcat(res, '\n')
     end;-- }}}
 
-    -- member functions supporting cascade oo style {{{
-    select = function (o, path) return class:new(o, o:xpath(path)) end;
-
-    attr = function (o, var, val) -- {{{
-        if type(val) == 'function' then -- handle data
-            if type(o['+']) ~= 'table' then return end
-            for i = 1, #(o['+']) do -- TODO
-                -- o[i]['@'] = o[i]['@'] or {}
-                -- if o[i]['@'][var] == nil then tinsert(o[i]['@'], var) end
-                -- o[i]['@'][var] = val(o['*'], i)
-            end
-        elseif val then
-            for _, t in ipairs(o) do
-                if t['@'][var] == nil then tinsert(t['@'], var) end
-                t['@'][var] = val
-            end
-            return o
-        end
-        local vals = {}
-        for _, t in ipairs(o) do tinsert(vals, t['@'][var]) end
-        return vals
-    end; -- }}}
-
-    text = function (o, txt)
-        if type(o[1]) == 'table' then tinsert(o[1], txt) end
-        return o
+    -- member functions supporting cascade oo style
+    select = function (o, path)
+        return class:new(o, o:xpath(path))
     end;
-
-    style = function (o, var, val) -- TODO
-        return o
-    end;
-
-    filter = function (o, func) -- TODO
-        return o
-    end;
-
-    map = function (o, func) -- TODO
-        return o
-    end;
-
-    insert = function (o, ele, i) -- {{{ also append
-        if type(o[1]) == 'table' then
-            tinsert(o[1], ((tonumber(i) or 0) -1) % (#(o[1]) + 1) + 1, {['.'] = ele})
-        end
-        return o
-    end; -- }}}
-
-    enter = function (o) -- TODO
-        return o
-    end;
-
-    data = function (o, data) -- attach
-        o['+'] = data
-        return o
-    end;
-
-    exit = function (o) -- TODO
-        return o
-    end;
-    -- }}}
-}
+} -- }}}
 
 local buildxlink = function () -- xlink -- xlink/xpointer based on root {{{
     for _, xml in ipairs(docs) do if xml.parse then xml:parse() end end
@@ -300,7 +243,7 @@ local buildxlink = function () -- xlink -- xlink/xpointer based on root {{{
             end
             stack[href] = true
 
-            if (not doc['&']) or (doc['&']['#'] ~= stamp) then -- attr
+            if (not doc['&']) or (doc['&'][0] ~= stamp) then -- attr
                 local link, xpath = strmatch(href, '^([^#]*)(.*)') -- {{{ file_link, tag_path
                 if link == '' then -- back to this doc root
                     link = xml
@@ -322,7 +265,7 @@ local buildxlink = function () -- xlink -- xlink/xpointer based on root {{{
                     doc['&'] = nil
                 else
                     doc['&'] = link -- xlink
-                    link['#'] = stamp
+                    link[0] = stamp
                     -- print(doc['@']['xlink:href'], 'linked', #link)
                 end
             end
@@ -339,22 +282,75 @@ local buildxlink = function () -- xlink -- xlink/xpointer based on root {{{
 end; -- }}}
 
 local lom = {
-    docs = docs; -- doctree for files, user's management
-    lapi = class.static[dom].__index; -- extension: api.style = function ... end
+    doc = docs; -- doctree for files, user's management
+    api = class.static[dom].__index; -- extension: api.style = function ... end
 }
 
 setmetatable(lom, {
     __metatable = true;
+    __tostring = function (c) return we.tbl2str(lom.doc, '\n') end;
     __call = function (c, spec) -- {{{ dom object creator
         if type(spec) == 'string' then -- '' for incremental text
             spec = we.normpath(spec)
             if docs[spec] then return docs[spec] end
         elseif spec and type(spec) ~= 'table' then -- closing
-            return buildxlink()
+            return buildxlink() -- TODO error message
         end
         return dom(spec)
     end; -- }}}
 })
+
+-- ================================================================== --
+-- member function extension TODO
+lom.api.attr = function (o, var, val) -- {{{
+    if type(val) == 'function' then -- handle data
+        if type(o[0]) ~= 'table' then return end
+        for i = 1, #(o[0]) do -- TODO
+            -- if not o[i] then o[i] = {['.'] =
+            -- ['@'] = o[i]['@'] or {}
+            -- if o[i]['@'][var] == nil then tinsert(o[i]['@'], var) end
+            -- o[i]['@'][var] = val(o['*'], i)
+        end
+    elseif val then
+        for _, t in ipairs(o) do
+            if t['@'][var] == nil then tinsert(t['@'], var) end
+            t['@'][var] = val
+        end
+        return o
+    end
+    local vals = {}
+    for _, t in ipairs(o) do tinsert(vals, t['@'][var]) end
+    return vals
+end -- }}}
+
+lom.api.text = function (o, txt)
+    if type(o[1]) == 'table' then tinsert(o[1], txt) end
+    return o
+end
+
+lom.api.realloc = function (o, ele, i) -- {{{ also remove/append TODO
+    if type(o[1]) == 'table' then
+        tinsert(o[1], ((tonumber(i) or 0) -1) % (#(o[1]) + 1) + 1, {['.'] = ele})
+    end
+    return o
+end -- }}}
+
+lom.api.data = function (o, data) -- attach
+    o[0] = data
+    return o
+end
+
+lom.api.filter = function (o, val) -- TODO
+    return o
+end
+
+lom.api.enter = function (o) -- TODO
+    return o
+end
+
+lom.api.exit = function (o) -- TODO
+    return o
+end
 
 -- ================================================================== --
 -- service for checking object model and demo/debug -- {{{
