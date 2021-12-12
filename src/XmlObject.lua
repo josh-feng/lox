@@ -2,7 +2,7 @@
 -- ======================================================================== --
 local class = require("pool")
 local lom = require("lom")
-local tun = require("util")
+local we = require("us")
 
 -- object corresponding to a xml tag w/ a class attribute
 --
@@ -36,9 +36,9 @@ local XmlObject = class { -- class module paradigm
             for i = 1, #node do -- {{{
                 local subn = node[i]
                 local suba = type(subn) == 'table' and subn['@'] -- subnode attr
-                if suba and suba.mod then -- skip node content/text: assign the object
-                    subn['*'] = assert(require(suba.mod), "fail loading "..suba.mod)(engine, subn)
-                    if tun.check(suba.strict) then -- check unused-tag {{{ honor metatable
+                if suba and suba.proc then -- skip node content/text: assign the object
+                    subn['*'] = assert(require(suba.proc), "fail loading "..suba.proc)(engine, subn)
+                    if we.check(suba.strict) then -- check unused-tag {{{ honor metatable
                         for j = 1, #subn do -- some of them are text/comments:
                             local v = subn[j]
                             if type(v) == 'table' and not string.find(subn['*'].dtd, v['.']) then
@@ -54,14 +54,14 @@ local XmlObject = class { -- class module paradigm
 
         -- standard basic attributes/elements
         o.mode = tonumber(o:XmlAttribute('mode')) or 0
-        o.skip = tun.check(o:XmlValue('Skip[1]'))
-        o.debug = tun.check(o:XmlValue('Debug[1]'))
+        o.skip = we.check(o:XmlValue('Skip[1]'))
+        o.debug = we.check(o:XmlValue('Debug[1]'))
     end; -- }}}
 
     -- ===================== xmlobject utility subroutine ================= --
     Info = function (o, msg) -- {{{
         local node = o.node
-        tun.info('('..(node['.'] or '.')..'['..(node['@'].name or '')..'])'..
+        we.info('('..(node['.'] or '.')..'['..(node['@'].name or '')..'])'..
             (msg and ' '..tostring(msg) or ''))
     end; ---}}}
 
@@ -81,9 +81,9 @@ local XmlObject = class { -- class module paradigm
             for i = 1, #tag do -- {{{
                 local subn = tag[i] -- subnode
                 local suba = subn['@']
-                if not (suba and suba.mod) then -- assign the object
+                if not (suba and suba.proc) then -- assign the object
                     subn['*'] = assert(require(cls), 'fail loading '..cls)(o.engine, subn)
-                    if tun.check(suba.strict) then -- check unused-tag {{{ honor metatable
+                    if we.check(suba.strict) then -- check unused-tag {{{ honor metatable
                         for j = 1, #subn do -- some of them are text/comments:
                             local v = subn[j]
                             if type(v) == 'table' and not string.find(subn['*'].dtd, v['.']) then
@@ -158,7 +158,7 @@ local XmlObject = class { -- class module paradigm
 }
 
 -- {{{ ==================  demo and self-test (QA)  ==========================
-local o = lom.xml({{['.'] = 'T', ' Fab  '; {['.'] = 'T', '8 '}},})
+local o = lom({{['.'] = 'T', ' Fab  '; {['.'] = 'T', '8 '}},})
 local q = XmlObject(nil, o) -- nil engine
 if -- failing conditins:
     q:XmlValue('T[0]')[1] ~= ' Fab  '
