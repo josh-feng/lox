@@ -17,6 +17,7 @@ local next, assert, type = next, assert, type
 local strlen, strsub, strmatch, strgmatch = string.len, string.sub, string.match, string.gmatch
 local strrep, strgsub, strfind = string.rep, string.gsub, string.find
 local tinsert, tremove, tconcat = table.insert, table.remove, table.concat
+local mmin = math.min
 -- ================================================================== --
 local docs = {} -- xml object list (hidden upvalue)
 
@@ -114,6 +115,12 @@ local function xPath (o, path, doc) -- {{{ return doc/xml-node table, missingTag
         xn = nxn
     end
     return xPath(o, path, xn)
+end -- }}}
+
+local function setAttr (t, var, val) -- {{{
+    t['@'] = t['@'] or {}
+    if t['@'][var] == nil then tinsert(t['@'], var) end
+    t['@'][var] = val
 end -- }}}
 -- ================================================================== --
 local function xmlstr (s, fenc) -- {{{
@@ -283,7 +290,7 @@ end; -- }}}
 
 local lom = {
     doc = docs; -- doctree for files, user's management
-    api = class.static[dom].__index; -- extension: api.style = function ... end
+    api = class[dom].__index; -- extension: api.style = function ... end
 }
 
 setmetatable(lom, {
@@ -302,28 +309,36 @@ setmetatable(lom, {
 
 -- ================================================================== --
 -- member function extension TODO
-lom.api.attr = function (o, var, val) -- {{{
-    if type(val) == 'function' then -- handle data
-        if type(o[0]) ~= 'table' then return end
-        for i = 1, #(o[0]) do -- TODO
-            -- if not o[i] then o[i] = {['.'] =
-            -- ['@'] = o[i]['@'] or {}
-            -- if o[i]['@'][var] == nil then tinsert(o[i]['@'], var) end
-            -- o[i]['@'][var] = val(o['*'], i)
-        end
-    elseif val then
-        for _, t in ipairs(o) do
-            if t['@'][var] == nil then tinsert(t['@'], var) end
-            t['@'][var] = val
+lom.api.data = function (o, data) -- attach {{{
+    o[0] = type(data) == 'table' and data or {data}
+    return o
+end -- }}}
+
+lom.api.attr = function (o, var, val) -- {{{ get/set
+    if val then
+        local c = type(val) == 'function' and type(o[0]) == 'table'
+        for i = 1, c and mmin(#o, #(o[0])) or #o do
+            setAttr(o[i], var, c and val(o[0], i) or val)
         end
         return o
     end
     local vals = {}
-    for _, t in ipairs(o) do tinsert(vals, t['@'][var]) end
+    for _, t in ipairs(o) do
+        tinsert(vals, t['@'] and t['@'][var] or false)
+    end
     return vals
 end -- }}}
 
-lom.api.text = function (o, txt)
+lom.api.map = function (o, func) -- map data and process nodes
+    if o[0] and type(func) == 'function' then
+        for i = 1, mmin(#o, #(o[0])) do
+            o[0][i] = func(o[0], i, o) -- pass o as well
+        end
+    end
+    return o
+end
+
+lom.api.text = function (o, txt) -- TODO
     if type(o[1]) == 'table' then tinsert(o[1], txt) end
     return o
 end
@@ -335,12 +350,7 @@ lom.api.realloc = function (o, ele, i) -- {{{ also remove/append TODO
     return o
 end -- }}}
 
-lom.api.data = function (o, data) -- attach
-    o[0] = data
-    return o
-end
-
-lom.api.filter = function (o, val) -- TODO
+lom.api.filter = function (o, val) -- TODO adjust
     return o
 end
 
