@@ -144,8 +144,7 @@ end -- }}}
 we.split = function (str, sep) -- {{{ split string w/ ':' into a table
     if type(str) ~= 'string' then return end
     local t = {}
-    sep = sep or ':'
-    for o in strgmatch(str..sep, '([^'..sep..']-)'..sep) do tinsert(t, o) end
+    for o in strgmatch(str, '[^'..(sep or ':')..']*') do tinsert(t, o) end
     return t
 end -- }}}
 
@@ -250,7 +249,7 @@ we.check = function (v) -- {{{ -- check v is true or false
     return (v == 'true') or (v == 'yes') or (v == 'y')
 end -- }}}
 -- ================================================================== --
-local function dumpVar (key, value, ctrl) -- {{{ dump variables in lua
+local function var2str (value, key, ctrl) -- {{{ dump variables in lua
     key = (type(key) == 'string' and strfind(key, '%W')) and '["'..key..'"]' or key
     local assign = type(key) == 'number' and '' or key..' = '
     if type(value) == 'number' then return assign..value end
@@ -278,12 +277,12 @@ local function dumpVar (key, value, ctrl) -- {{{ dump variables in lua
     if #value > 0 then -- {{{
         if keyhead then
             for i = #value, 1, -1 do -- {{{
-                local v = dumpVar(i, value[i], ctrl)
+                local v = var2str(value[i], i, ctrl)
                 if v ~= '' then tinsert(ctrl.def, 1, keyhead..'['..i..'] = '..v) end
             end -- }}}
         else
             for i = 1, #value do -- {{{
-                local v = dumpVar(i, value[i], ctrl)
+                local v = var2str(value[i], i, ctrl)
                 if v ~= '' then tinsert(res, v) end
             end -- }}}
         end
@@ -307,7 +306,7 @@ local function dumpVar (key, value, ctrl) -- {{{ dump variables in lua
     if #kset > 0 then -- {{{
         table.sort(kset)
         for i = 1, #kset do
-            local v = dumpVar(kset[i], value[kset[i]], ctrl)
+            local v = var2str(value[kset[i]], kset[i], ctrl)
             if v ~= '' then -- {{{
                 if keyhead then -- recursive so must be the first
                     tinsert(ctrl.def, 1, keyhead..(strsub(v, 1, 1) == '[' and v or '.'..v))
@@ -329,12 +328,9 @@ local function dumpVar (key, value, ctrl) -- {{{ dump variables in lua
     return assign..'{\n'..tmp1..strgsub(res, '\n', '\n'..tmp1)..'\n}'..extdef
 end -- }}}
 
-we.dumpVar = function (key, value, ext) -- {{{
-    -- e.g. print(we.dumpVar('a', a, {1, L4=3}))
-    -- e.g. print(we.dumpVar('a', a,
-    -- {1, ['a.b.1.3.5'] = 'ab',
-    --     ['a.b.1.3.5'] = 13,
-    -- }))
+we.var2str = function (value, key, ext) -- {{{
+    -- e.g. print(we.var2str(a, 'a', {1, L4=3}))
+    -- e.g. print(we.var2str(a, 'a', {1, ['a.b.1.3.5'] = 'ab', ['a.b.1.3.5'] = 13, }))
     local ctrl = {def = {}, len = 111, num = 11} -- external definitions m# = cloumn_num
     if type(ext) == 'table' then -- {{{
         ctrl.len = ext.len or ctrl.len -- max txt width
@@ -344,11 +340,27 @@ we.dumpVar = function (key, value, ext) -- {{{
         end
         ctrl.ext = ext -- control table
     end -- }}}
-    return dumpVar(key, value, ctrl)
+    return var2str(value, key or 0, ctrl)
 end -- }}}
 -- ================================================================== --
 -- =====================  TABLES FUNCTIONS  ========================= --
 -- ================================================================== --
+we.cloneTbl = function (src) -- {{{ fully copy table
+    local tbls = {}
+    local function cloneTbl (src)
+        if tbls[src] then return tbls end
+        local targ = {}
+        tbls[src] = targ
+        for k, v in pairs(src) do
+            targ[k] = type(v) == 'table' and cloneTbl(v) or v
+        end
+        local mt = getmetatable(src)
+        if type(mt) == 'table' then setmetatable(targ, cloneTbl(mt)) end
+        return targ
+    end
+    return cloneTbl(src)
+end -- }}}
+
 we.traceTbl = function (tbl, testkey, procvalue, ...) -- {{{ table trace
     for k, v in pairs(tbl) do
         if testkey(k) then
