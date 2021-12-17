@@ -132,7 +132,7 @@ we.loadStr = function (filename, verify) -- {{{ load a file into a string
     return chunk
 end -- }}}
 
-we.dumpStr = function (o, filename, verify) -- {{{ dump a string to a file
+we.emitStr = function (o, filename, verify) -- {{{ emit a string to a file
     local file, msg = io.open(filename, 'w')
     if file == nil then return verify and error(msg) or msg end
     file:write(type(o) == 'table' and we.tbl2str(o, '\n') or tostring(o))
@@ -249,7 +249,7 @@ we.check = function (v) -- {{{ -- check v is true or false
     return (v == 'true') or (v == 'yes') or (v == 'y')
 end -- }}}
 -- ================================================================== --
-local function var2str (value, key, ctrl) -- {{{ dump variables in lua
+local function var2str (value, key, ctrl) -- {{{ emit variables in lua
     key = (type(key) == 'string' and strfind(key, '%W')) and '["'..key..'"]' or key
     local assign = type(key) == 'number' and '' or key..' = '
     if type(value) == 'number' then return assign..value end
@@ -267,9 +267,11 @@ local function var2str (value, key, ctrl) -- {{{ dump variables in lua
     end -- }}}
     local res, kset, tmp1 = {}, {}, ctrl['L'..#ctrl]
     for k, v in pairs(value) do
-        if type(k) == 'string' then
-            tinsert(kset, k)
-        elseif type(v) == 'table' and type(k) == 'number' then -- 2D format
+        if type(k) ~= 'number' or k < 1 or k > #value  then
+            v = tostring(k)
+            kset[v] = k
+            tinsert(kset, v)
+        elseif type(v) == 'table' then -- 2D format
             tmp1 = false
         end
     end
@@ -306,7 +308,7 @@ local function var2str (value, key, ctrl) -- {{{ dump variables in lua
     if #kset > 0 then -- {{{
         table.sort(kset)
         for i = 1, #kset do
-            local v = var2str(value[kset[i]], kset[i], ctrl)
+            local v = var2str(value[kset[kset[i]]], kset[i], ctrl)
             if v ~= '' then -- {{{
                 if keyhead then -- recursive so must be the first
                     tinsert(ctrl.def, 1, keyhead..(strsub(v, 1, 1) == '[' and v or '.'..v))
@@ -347,14 +349,14 @@ end -- }}}
 -- ================================================================== --
 we.cloneTbl = function (src) -- {{{ fully copy table
     local tbls = {}
-    local function cloneTbl (src)
-        if tbls[src] then return tbls end
+    local function cloneTbl (_src)
+        if tbls[_src] then return tbls end
         local targ = {}
-        tbls[src] = targ
-        for k, v in pairs(src) do
+        tbls[_src] = targ
+        for k, v in pairs(_src) do
             targ[k] = type(v) == 'table' and cloneTbl(v) or v
         end
-        local mt = getmetatable(src)
+        local mt = getmetatable(_src)
         if type(mt) == 'table' then setmetatable(targ, cloneTbl(mt)) end
         return targ
     end
