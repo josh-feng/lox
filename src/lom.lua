@@ -7,7 +7,7 @@
 --      doc = lom(xmlfile or '')
 --      doc = lom() doc:parse(txt):parse()
 --      lom(true) -- buildxlink
---      xmltxt = doc:dump(1)
+--      xmltxt = doc:emit(1)
 -- ================================================================== --
 local lxp = require('lxp') -- the standard Lua Expat module
 local class = require('pool') -- https://github.com/josh-feng/pool.git
@@ -59,16 +59,19 @@ local function parse (o, txt) -- friend function {{{
     return o -- for cascade oop
 end --}}}
 -- ================================================================== --
-local function xPath (o, path, doc) -- {{{ return doc/xml-node table, missingTag
+local function xPath (c, paths, doc) -- {{{ return doc/xml-node table, missingTag
+    local path = paths[c]
+    -- TODO
     if (not path) or path == '' or #doc == 0 then return doc, path end
     -- xpath syntax: NB: xpointer does not have standard treatment
     -- /A/B[@attr="val",@bb='4']
     -- anywhere/A/B[-3]/-2/3
     local anywhere = strsub(path, 1, 1) ~= '/'
+
     local tagatt
     tagatt, path = strmatch(path, '([^/]+)(.*)$')
     local idx = tonumber(tagatt)
-    if idx then return xPath(o, path, {doc[(idx - 1) % #doc + 1]}) end
+    if idx then return xPath(c, path, {doc[(idx - 1) % #doc + 1]}) end
     local tag, attr = strmatch(tagatt, '([^%[]+)%[?([^%]]*)')
     local attrspec, autopass = we.str2tbl(attr)
 
@@ -85,7 +88,7 @@ local function xPath (o, path, doc) -- {{{ return doc/xml-node table, missingTag
                     local mtl = mt['&']
                     local mtn = mtl and 0
                     repeat
-                        local sub = xPath(o, tagatt, mt)
+                        local sub = xPath(c, tagatt, mt)
                         for j = 1, #sub do tinsert(xn, sub[j]) end
                         if mtn then mtn = mtn < #mtl and mtn + 1 end
                         mt = mtn and mtl[mtn]
@@ -114,14 +117,47 @@ local function xPath (o, path, doc) -- {{{ return doc/xml-node table, missingTag
         end
         xn = nxn
     end
-    return xPath(o, path, xn)
+    return xPath(c, path, xn)
 end -- }}}
 
-local function setAttr (t, var, val) -- {{{
-    t['@'] = t['@'] or {}
-    if t['@'][var] == nil then tinsert(t['@'], var) end
-    t['@'][var] = val
+local function procXpath (path) -- {{{ XPath language parser
+    -- xpath: path0/path1/path3[att1,att2=txt,attr3='txt']
+    local t = {}
+    repeat
+        local elem, attr
+        elem, path = strmatch(path, '^(/?[%w_:]*)(.*)$')
+        elem = {[0] = elem}
+        if strsub(path, 1, 1) == '[' then
+            while strsub(path, 1, 1) ~= ']' do
+                attr, path = strmatch(strsub(path, 2, #path), '^([_%w]*)(.*)$')
+                local c = strsub(path, 1, 1)
+                if tonumber(attr) then
+                    tinsert(elem, tonumber(attr))
+                elseif c == ',' then
+                    path = strsub(path, 2, #path)
+                    elem[attr] = true
+                elseif c == '=' then -- '/" ...
+                    c = strsub(path, 2, 2)
+                    if c == '"' or c == "'" then
+                        c, path = strmatch(strsub(path, 3, #path), '^([^'..c..']*)'..c..'(.*)$')
+                        if not c then error('Wrong attr quote', 2) end
+                        elem[attr] = c
+                    else
+                        c, path = strmatch(strsub(path, 2, #path), '^([^,%]]*)(.*)$')
+                        elem[attr] = c
+                    end
+                elseif c ~= ']' then
+                    error('Wrong attr setting: '..attr..':'..path, 2)
+                end
+                if #path < 1 then error('Wrong attr setting', 2) end
+            end
+            path = strsub(path, 2, #path)
+        end
+        tinsert(t, elem)
+    until path == ''
+    return t
 end -- }}}
+
 -- ================================================================== --
 local function xmlstr (s, fenc) -- {{{
     -- encode: gzip -c | base64 -w 128
@@ -145,7 +181,7 @@ local function xmlstr (s, fenc) -- {{{
     end
 end -- }}}
 
-local function dumpLom (node) -- {{{
+local function wXml (node) -- {{{
     if 'string' == type(node) then
         return strsub(node, 1, 1) ~= '\0' and node or '<!--'..node..'-->'
     end
@@ -156,7 +192,7 @@ local function dumpLom (node) -- {{{
     res = '<'..node['.']..(#res > 0 and ' '..tconcat(res, ' ') or '')
     if #node == 0 then return res..' />' end
     res = {res..'>'}
-    for i = 1, #node do tinsert(res, type(node[i]) == 'table' and dumpLom(node[i]) or xmlstr(node[i])) end
+    for i = 1, #node do tinsert(res, type(node[i]) == 'table' and wXml(node[i]) or xmlstr(node[i])) end
     if #res == 2 and #(res[2]) < 100 and not strfind(res[2], '\n') then
         return res[1]..res[2]..'</'..node['.']..'>'
     end
@@ -212,16 +248,19 @@ local dom = class { -- lua document object model {{{
 
     parse = false; -- implemented in friend function
 
-    xpath = function (o, path, doc) return xPath(o, path, doc or o) end;
+    xpath = function (o, path, doc)
+        path = procXpath(path)
+        return xPath(1, path, doc or o)
+    end;
 
     -- output
-    dump = function (o, fxml) -- {{{ dump fxml=1/html
-        if not fxml then return we.dumpVar(0, o) end
+    emit = function (o, fxml) -- {{{ emit fxml=1/html
+        if not fxml then return we.var2str(o) end
         local res = {fxml == 1 and '<?xml version="1.0" encoding="UTF-8"?>' or nil}
         local docl = o['&']
         local docn = docl and 0
         repeat
-            for j = 1, #o do tinsert(res, dumpLom(o[j])) end
+            for j = 1, #o do tinsert(res, wXml(o[j])) end
             if docn then docn = docn < #docl and docn + 1 end
             o = docn and docl[docn]
         until not o
@@ -314,6 +353,12 @@ lom.api.data = function (o, data) -- attach {{{
     return o
 end -- }}}
 
+local function setAttr (t, var, val) -- {{{
+    t['@'] = t['@'] or {}
+    if t['@'][var] == nil then tinsert(t['@'], var) end
+    t['@'][var] = val
+end -- }}}
+
 lom.api.attr = function (o, var, val) -- {{{ get/set
     if val then
         local c = type(val) == 'function' and type(o[0]) == 'table'
@@ -368,7 +413,7 @@ if arg and #arg > 0 and strfind(arg[0], 'lom.lua$') then
     local doc = lom(arg[1] == '-' and '' or arg[1])
     if arg[1] == '-' then doc:parse(io.stdin:read('a')):parse() end
     lom(true)
-    print(doc['?'] and tconcat(doc['?'], '\n') or doc:dump())
+    print(doc['?'] and tconcat(doc['?'], '\n') or doc:emit())
 end -- }}}
 
 return lom
