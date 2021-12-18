@@ -204,24 +204,32 @@ we.tbl2str = function (tbl, sep) -- {{{ build the set
     return tconcat(res, sep or ',')
 end -- }}}
 
-we.str2tbl = function (tmpl, sep, set) -- {{{ -- build the tmpl from string
+we.str2tbl = function (txt) -- {{{ -- build the tmpl from string
     local res = {}
-    local autopass = true
-    if tmpl then
-        set = set or '='
-        for token in strgmatch(strgsub(tmpl, sep or ',', ' '), '(%S+)') do
-            local k, v = strmatch(token, '([^'..set..']+)'..set..'(.*)')
-            if k and v and k ~= '' then
-                local q, qo = strmatch(v, '^([\'"])(.*)%1$') -- trim qotation mark
-                res[k] = qo or v
-                autopass = false
+    local var
+    while txt ~= '' do
+        var, txt = strmatch(strsub(txt, 2, #txt), '^([_%w]*)(.*)$')
+        local c = strsub(txt, 1, 1)
+        if tonumber(var) then
+            tinsert(res, tonumber(var))
+        elseif c == ',' then -- sep
+            txt = strsub(txt, 2, #txt)
+            res[var] = true
+        elseif c == '=' then -- set (NB: '/" ...)
+            c = strsub(txt, 2, 2)
+            if c == '"' or c == "'" then
+                c, txt = strmatch(strsub(txt, 3, #txt), '^([^'..c..']*)'..c..'(.*)$')
+                if not c then error('Wrong var quote', 2) end
+                res[var] = c
             else
-                tinsert(res, tonumber(token) or token)
-                if autopass then autopass = type(res[#res]) == 'number' end
+                c, txt = strmatch(strsub(txt, 2, #txt), '^([^,%]]*)(.*)$')
+                res[var] = c
             end
+        else
+            error('Wrong var setting: '..var..':'..txt, 2)
         end
     end
-    return res, autopass
+    return res
 end -- }}}
 
 we.match = function (targ, tmpl, fExact) -- {{{ -- match assignment in tmpl

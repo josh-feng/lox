@@ -158,7 +158,6 @@ local function procXpath (path) -- {{{ XPath language parser
     until path == ''
     return t
 end -- }}}
-
 -- ================================================================== --
 local function xmlstr (s, fenc) -- {{{
     -- encode: gzip -c | base64 -w 128
