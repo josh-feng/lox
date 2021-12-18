@@ -7,7 +7,7 @@
 --      doc = lom(xmlfile or '')
 --      doc = lom() doc:parse(txt):parse()
 --      lom(true) -- buildxlink
---      xmltxt = doc:emit(1)
+--      xmltxt = doc:drop(1)
 -- ================================================================== --
 local lxp = require('lxp') -- the standard Lua Expat module
 local class = require('pool') -- https://github.com/josh-feng/pool.git
@@ -59,21 +59,27 @@ local function parse (o, txt) -- friend function {{{
     return o -- for cascade oop
 end --}}}
 -- ================================================================== --
-local function xPath (c, paths, doc) -- {{{ return doc/xml-node table, missingTag
+local function xPath (c, paths, doc) -- {{{ return doc/xml-node table, ending index
     local path = paths[c]
-    -- TODO
-    if (not path) or path == '' or #doc == 0 then return doc, path end
+    if (not path) or path[0] == '/' or path[0] == '' or #doc == 0 then return doc, c end
     -- xpath syntax: NB: xpointer does not have standard treatment
     -- /A/B[@attr="val",@bb='4']
     -- anywhere/A/B[-3]/-2/3
-    local anywhere = strsub(path, 1, 1) ~= '/'
+    local anywhere = strsub(path[0], 1, 1) ~= '/'
+    local tag = anywhere and path[0] or strsub(path[0], 2, #path[0])
 
-    local tagatt
-    tagatt, path = strmatch(path, '([^/]+)(.*)$')
-    local idx = tonumber(tagatt)
-    if idx then return xPath(c, path, {doc[(idx - 1) % #doc + 1]}) end
-    local tag, attr = strmatch(tagatt, '([^%[]+)%[?([^%]]*)')
-    local attrspec, autopass = we.str2tbl(attr)
+    -- local tagatt
+    -- tagatt, path = strmatch(path, '([^/]+)(.*)$')
+
+    local idx = tonumber(path)
+    if idx then return xPath(c + 1, paths, {doc[(idx - 1) % #doc + 1]}) end
+
+    -- local tag, attr = strmatch(tagatt, '([^%[]+)%[?([^%]]*)')
+    -- local attrspec, autopass = we.str2tbl(attr)
+    local autopass = true
+    for i = 1, #path do
+        if autopass then autopass = type(path[i]) == 'number' else break end
+    end
 
     local xn = {} -- xml-node (doc)
     local docl = doc['&']
@@ -82,13 +88,13 @@ local function xPath (c, paths, doc) -- {{{ return doc/xml-node table, missingTa
         for i = 1, #doc do
             local mt = doc[i]
             if type(mt) == 'table' then
-                if mt['.'] == tag and (autopass or we.match(mt['@'], attrspec)) then
+                if mt['.'] == tag and (autopass or we.match(mt['@'], path)) then
                     tinsert(xn, mt)
                 elseif anywhere and (#mt > 0 or mt['&']) then
                     local mtl = mt['&']
                     local mtn = mtl and 0
                     repeat
-                        local sub = xPath(c, tagatt, mt)
+                        local sub = xPath(c, paths, mt)
                         for j = 1, #sub do tinsert(xn, sub[j]) end
                         if mtn then mtn = mtn < #mtl and mtn + 1 end
                         mt = mtn and mtl[mtn]
@@ -100,11 +106,11 @@ local function xPath (c, paths, doc) -- {{{ return doc/xml-node table, missingTa
         doc = docn and docl[docn]
     until not doc
 
-    if #attrspec > 0 and #xn > 0 then -- collect the indixed table
+    if #path > 0 and #xn > 0 then -- collect the indixed table
         local nxn = {}
-        for i = 1, #attrspec do
-            if type(attrspec[i]) == 'number' then
-                tinsert(nxn, xn[(attrspec[i] - 1) % #xn + 1])
+        for i = 1, #path do
+            if type(path[i]) == 'number' then
+                tinsert(nxn, xn[(path[i] - 1) % #xn + 1])
             end
         end
         if #nxn ~= 0 then xn = nxn end -- collected
@@ -117,7 +123,7 @@ local function xPath (c, paths, doc) -- {{{ return doc/xml-node table, missingTa
         end
         xn = nxn
     end
-    return xPath(c, path, xn)
+    return xPath(c + 1, paths, xn)
 end -- }}}
 
 local function procXpath (path) -- {{{ XPath language parser
@@ -254,7 +260,7 @@ local dom = class { -- lua document object model {{{
     end;
 
     -- output
-    emit = function (o, fxml) -- {{{ emit fxml=1/html
+    drop = function (o, fxml) -- {{{ drop fxml=1/html
         if not fxml then return we.var2str(o) end
         local res = {fxml == 1 and '<?xml version="1.0" encoding="UTF-8"?>' or nil}
         local docl = o['&']
@@ -302,10 +308,11 @@ local buildxlink = function () -- xlink -- xlink/xpointer based on root {{{
 
                 if (type(link) == 'string') and not docs[link] then docs[link] = dom(link) end
                 if xml ~= link then traceTbl(docs[link], link) end
-                link, xpath = xPath(o, strmatch(xpath or '', '#xpointer%((.*)%)'), docs[link])
+                local paths = procXpath(strmatch(xpath or '', '#xpointer%((.*)%)'))
+                link, xpath = xPath(1, paths, docs[link])
 
                 if #link == 0 then -- error message
-                    href ='broken <'..doc['.']..'> '..xpath
+                    href ='broken path <'..doc['.']..'> '..tostring(xpath)
                     if not docs[xml]['?'] then docs[xml]['?'] = {} end
                     tinsert(docs[xml]['?'], href)
                     doc['&'] = nil
@@ -413,7 +420,7 @@ if arg and #arg > 0 and strfind(arg[0], 'lom.lua$') then
     local doc = lom(arg[1] == '-' and '' or arg[1])
     if arg[1] == '-' then doc:parse(io.stdin:read('a')):parse() end
     lom(true)
-    print(doc['?'] and tconcat(doc['?'], '\n') or doc:emit())
+    print(doc['?'] and tconcat(doc['?'], '\n') or doc:drop())
 end -- }}}
 
 return lom
