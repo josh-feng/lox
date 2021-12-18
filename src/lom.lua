@@ -68,17 +68,12 @@ local function xPath (c, paths, doc) -- {{{ return doc/xml-node table, ending in
     local anywhere = strsub(path[0], 1, 1) ~= '/'
     local tag = anywhere and path[0] or strsub(path[0], 2, #path[0])
 
-    -- local tagatt
-    -- tagatt, path = strmatch(path, '([^/]+)(.*)$')
-
     local idx = tonumber(path)
     if idx then return xPath(c + 1, paths, {doc[(idx - 1) % #doc + 1]}) end
 
-    -- local tag, attr = strmatch(tagatt, '([^%[]+)%[?([^%]]*)')
-    -- local attrspec, autopass = we.str2tbl(attr)
     local autopass = true
     for i = 1, #path do
-        if autopass then autopass = type(path[i]) == 'number' else break end
+        if autopass then autopass = (type(path[i]) == 'number') else break end
     end
 
     local xn = {} -- xml-node (doc)
@@ -354,7 +349,7 @@ setmetatable(lom, {
 })
 
 -- ================================================================== --
--- member function extension TODO
+-- member function extension
 lom.api.data = function (o, data) -- attach {{{
     o[0] = type(data) == 'table' and data or {data}
     return o
