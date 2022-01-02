@@ -100,11 +100,11 @@ we.cmd = function (cmd, multi) -- {{{ do as told quietly: cmd('cd / ; ls', true)
     return assert(os.execute(cmd..' > /dev/null 2>&1'))
 end -- }}}
 
-we.ask = function (cmd, multi) -- {{{ Est-ce-que (Alor, on veut savoir le resultat)
+we.ask = function (cmd, multi, err) -- {{{ Est-ce-que (Alor, on veut savoir le resultat)
     we.dbg(cmd)
-    if multi then cmd = string.gsub(cmd, ';', ' 2>&1;') end
+    if err and multi then cmd = string.gsub(cmd, ';', ' 2>&1;') end
     -- NB: lua use (POSIX) sh, we can use 2>&1 to redirect stderr to stdout
-    local file = io.popen(cmd..' 2>&1', 'r')
+    local file = io.popen(cmd..(err and ' 2>&1' or ''), 'r')
     local msg = file:read('*all')
     file:close()
     return msg
