@@ -1,5 +1,5 @@
 #!/usr/bin/env lua
--- ======================================================================== --
+-- ===================================================================== --
 local class = require("pool")
 local lom = require("lom")
 local we = require("us")
@@ -58,14 +58,14 @@ local XmlObject = class { -- class module paradigm
         o.debug = we.check(o:XmlValue('Debug[1]'))
     end; -- }}}
 
-    -- ===================== xmlobject utility subroutine ================= --
+    -- ==================== xmlobject utility subroutine =============== --
     Info = function (o, msg) -- {{{
         local node = o.node
         we.info('('..(node['.'] or '.')..'['..(node['@'].name or '')..'])'..
             (msg and ' '..tostring(msg) or ''))
     end; ---}}}
 
-    -- ====== tag handling functions: order kept, but keys destroyed ====== --
+    -- ===== tag handling functions: order kept, but keys destroyed ==== --
     XmlAttribute = function (o, attr, errmsg) -- {{{
         return o.node['@'] and o.node['@'][attr] or
             (ermsg and error("Missing attribute("..o.node['.']..'@'..attr..") "..tostring(errmsg), 2))
@@ -136,7 +136,7 @@ local XmlObject = class { -- class module paradigm
         end
     end; -- }}}
 
-    -- ===================== customize (place holdr) ====================== --
+    -- =================== customize (place holdr) ===================== --
     Build = function (o, dbgmsg) -- self: based on the node content to modify the engine data {{{
         if o.skip then return dbgmsg and o:Info(dbgmsg) end -- infra CODING debug message
         local node, engine, data = o.node, o.engine, o.engine.data
@@ -157,13 +157,13 @@ local XmlObject = class { -- class module paradigm
     end; -- }}}
 }
 
--- {{{ ==================  demo and self-test (QA)  ==========================
-local o = lom({{['.'] = 'T', ' Fab  '; {['.'] = 'T', '8 '}},})
-local q = XmlObject(nil, o) -- nil engine
+-- {{{ ==================  demo and self-test (QA)  =======================
+local q = XmlObject(nil, lom({{['.'] = 'T', ' F  '; {['.'] = 'T', '8 '}},})) -- nil engine
 if -- failing conditins:
-    q:XmlValue('T[0]')[1] ~= ' Fab  '
+    q:XmlValue('T[0]')[1] ~= ' F  '
     or q:XmlElement('T[2]')[1][2][1] ~= '8 '
-then error('QA failed.', 1) end -- }}}
+then error('QA failed.', 1) end
+lom.doc[#(lom.doc)] = nil -- clean dummy doc from lom -- }}}
 
 return XmlObject
 -- vim:ts=4:sw=4:sts=4:et:fen:fdm=marker:fmr={{{,}}}:fdl=1
