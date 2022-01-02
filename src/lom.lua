@@ -5,7 +5,7 @@
 -- Usage example:
 --      lom = require('lom')
 --      doc = lom(xmlfile or '')
---      doc = lom() doc:parse(txt):parse()
+--      doc = lom('') doc:parse(txt):parse()
 --      lom(true) -- buildxlink
 --      xmltxt = doc:drop(1)
 -- ================================================================== --
@@ -19,7 +19,9 @@ local strrep, strgsub, strfind = string.rep, string.gsub, string.find
 local tinsert, tremove, tconcat = table.insert, table.remove, table.concat
 local mmin = math.min
 -- ================================================================== --
-local docs = {} -- xml object list (hidden upvalue)
+local lom = {doc = {}} -- doctree for files, user's management {{{
+
+local docs = lom.doc -- xml object list (hidden upvalue)
 
 local function starttag (p, name, attr) -- {{{
     local stack = p:getcallbacks().stack
@@ -110,7 +112,8 @@ local function xPath (c, paths, doc) -- {{{ return doc/xml-node table, ending in
         end
         if #nxn ~= 0 then xn = nxn end -- collected
     end
-    if path ~= '' and #xn > 0 then -- not final so break for further search
+    -- not final: break to further search
+    if #xn > 0 and c ~= #paths and path ~= '' then
         local nxn = {}
         for i = 1, #xn do
             local mt = xn[i]
@@ -328,10 +331,6 @@ local buildxlink = function () -- xlink -- xlink/xpointer based on root {{{
     -- for xml, o in pairs(docs) do print(xml, o['?'] and tconcat(o['?'], '\n')) end
 end; -- }}}
 
-local lom = {
-    doc = docs; -- doctree for files, user's management
-    api = class[dom].__index; -- extension: api.style = function ... end
-}
 
 setmetatable(lom, {
     __metatable = true;
@@ -346,9 +345,10 @@ setmetatable(lom, {
         return dom(spec)
     end; -- }}}
 })
-
+-- }}}
 -- ================================================================== --
--- member function extension
+lom.api = class[dom].__index; -- member function extension
+
 lom.api.data = function (o, data) -- attach {{{
     o[0] = type(data) == 'table' and data or {data}
     return o
@@ -361,7 +361,7 @@ local function setAttr (t, var, val) -- {{{
 end -- }}}
 
 lom.api.attr = function (o, var, val) -- {{{ get/set
-    if val then
+    if val then -- cascade coding
         local c = type(val) == 'function' and type(o[0]) == 'table'
         for i = 1, c and mmin(#o, #(o[0])) or #o do
             setAttr(o[i], var, c and val(o[0], i) or val)
@@ -375,21 +375,23 @@ lom.api.attr = function (o, var, val) -- {{{ get/set
     return vals
 end -- }}}
 
-lom.api.map = function (o, func) -- map data and process nodes
+lom.api.map = function (o, func) -- map data and process nodes {{{
     if o[0] and type(func) == 'function' then
         for i = 1, mmin(#o, #(o[0])) do
             o[0][i] = func(o[0], i, o) -- pass o as well
         end
     end
     return o
-end
+end -- }}}
 
-lom.api.text = function (o, txt) -- TODO
-    if type(o[1]) == 'table' then tinsert(o[1], txt) end
+lom.api.text = function (o, txt) -- {{{
+    for i = 1, #o do
+        if type(o[i]) == 'table' then tinsert(o[i], txt) end
+    end
     return o
-end
+end -- }}}
 
-lom.api.realloc = function (o, ele, i) -- {{{ also remove/append TODO
+lom.api.arrange = function (o, ele, i) -- {{{ also remove/append TODO
     if type(o[1]) == 'table' then
         tinsert(o[1], ((tonumber(i) or 0) -1) % (#(o[1]) + 1) + 1, {['.'] = ele})
     end
@@ -410,7 +412,7 @@ end
 
 -- ================================================================== --
 -- service for checking object model and demo/debug -- {{{
-if arg and #arg > 0 and strfind(arg[0], 'lom.lua$') then
+if arg and #arg > 0 and strfind(arg[0] or '', 'lom.lua$') then
     local doc = lom(arg[1] == '-' and '' or arg[1])
     if arg[1] == '-' then doc:parse(io.stdin:read('a')):parse() end
     lom(true)
