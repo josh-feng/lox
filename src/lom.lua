@@ -252,8 +252,7 @@ local dom = class { -- lua document object model {{{
     parse = false; -- implemented in friend function
 
     xpath = function (o, path, doc)
-        path = procXpath(path)
-        return xPath(1, path, doc or o)
+        return (xPath(1, procXpath(path), doc or o)) -- only first
     end;
 
     -- output
@@ -328,9 +327,7 @@ local buildxlink = function () -- xlink -- xlink/xpointer based on root {{{
         end
     end -- }}}
     for xml, o in pairs(docs) do if not o['?'] then traceTbl(o, xml) end end
-    -- for xml, o in pairs(docs) do print(xml, o['?'] and tconcat(o['?'], '\n')) end
 end; -- }}}
-
 
 setmetatable(lom, {
     __metatable = true;
@@ -347,7 +344,7 @@ setmetatable(lom, {
 })
 -- }}}
 -- ================================================================== --
-lom.api = class[dom].__index; -- member function extension
+lom.api = class[dom].__index; -- dom's member function extension
 
 lom.api.data = function (o, data) -- attach {{{
     o[0] = type(data) == 'table' and data or {data}
