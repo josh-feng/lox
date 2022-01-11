@@ -47,6 +47,7 @@ We will see if running lua inside a browser (console) is possible.
 
 - lua >= 5.1
 - luaExpat: <http://www.keplerproject.org/luaexpat> or <https://github.com/LuaDist/luaexpat>
+- posix <https://github.com/luaposix/luaposix/> (required by `us.lua`)
 - pool: <https://github.com/josh-feng/pool.git>
 
 
@@ -60,7 +61,7 @@ lom = require('lom')
 
 doc1 = lom('/path/to/file.xml' or '')   -- doc object
 
-doc2 = lom()
+doc2 = lom('')
 doc2:parse(xmltxt_1)
 -- ...
 doc2:parse(xmltxt_n):parse()
@@ -76,9 +77,9 @@ There are 3 ways to create document objects with different initial arguments
 
     parser will process the whole xml file.
 
-- nil: `doc = lom()`
+- empty string: `doc = lom('')`
 
-    xml text can be supplied to parser in sequence: `doc:parse(txt)`.
+    xml text fragments can be supplied to parser in sequence: `doc:parse(txt)`.
     If calling its paser with `nil`, the parser stage will be closed,
     and the doc is fully processed: `doc:parse()`.
 
@@ -108,14 +109,58 @@ lom(true)
 
 
 
-Some standards
+Some standards for xpath
 - <https://developer.mozilla.org/en-US/docs/Web/XPath>
 - <https://www.w3schools.com/xml/xpath_intro.asp>
 
 Lox partially implement XPATH standards. Some functionality
 can be achieved by doc `lom.api` extensions.
 
-xpath and xlinks
+xpath and xlinks can be shown in following cross-linked xml files
+
+`a.xml`
+
+```html
+<a>
+    <b>we</b>
+    <c />
+    <d />
+    <e />
+    <b>us</b>
+</a>
+```
+
+`b.xml`
+
+```html
+<b>
+    <aa />
+    <c xlink:href="a.xml#xpointer(/a/b)" />
+    <d xlink:href="a.xml#xpointer(/a/b/)" />
+</b>
+```
+
+
+The `lom` will parse these 2 files and then build the xlink:
+
+```lua
+{
+    {
+        {["."] = "aa"},
+        {
+            ["&"] = {{"we", ["."] = "b"}, {"us", ["."] = "b"}, 0 = 0.84018771676347},
+            ["."] = "c",
+            ["@"] = {"xlink:href", ["xlink:href"] = "a.xml#xpointer(/a/b)"}
+        },
+        {
+            ["&"] = {"we", "us", 0 = 0.84018771676347},
+            ["."] = "d",
+            ["@"] = {"xlink:href", ["xlink:href"] = "a.xml#xpointer(/a/b/)"}
+        },
+        ["."] = "b"
+    }
+}
+```
 
 
 ## XmlObject
