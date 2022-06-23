@@ -11,13 +11,13 @@ local we = require("us")
 -- function/method Build and Validate are implemented by the developer
 --
 -- @param o         xmlobject self
--- @param engine    engine object
 -- @param node      xml data node
+-- @param engine    engine object
 -- @return          this basic class
 local XmlObject = class { -- class module paradigm
     id = "";
-    engine = false; -- engine class
     node = false;   -- lom
+    engine = false; -- engine class
 
     mode = false;   -- strict/checking mode
     skip = false;   -- (backward compatible)
@@ -26,9 +26,9 @@ local XmlObject = class { -- class module paradigm
 
     -- assign the xmlobject's engine and lom-node
     -- create all modules/objects for the subnodes (non-recursively)
-    ["<"] = function (o, engine, node) -- {{{ constructor
+    ["<"] = function (o, node, engine) -- {{{ constructor
+        o.node = node
         o.engine = engine
-        o.node = node -- node
 
         local nodel = node['&']
         local nodec = nodel and 0
@@ -37,7 +37,7 @@ local XmlObject = class { -- class module paradigm
                 local subn = node[i]
                 local suba = type(subn) == 'table' and subn['@'] -- subnode attr
                 if suba and suba.proc then -- skip node content/text: assign the object
-                    subn['*'] = assert(require(suba.proc), "fail loading "..suba.proc)(engine, subn)
+                    subn['*'] = assert(require(suba.proc), "fail loading "..suba.proc)(subn, engine)
                     if we.check(suba.strict) then -- check unused-tag {{{ honor metatable
                         for j = 1, #subn do -- some of them are text/comments:
                             local v = subn[j]
@@ -82,7 +82,7 @@ local XmlObject = class { -- class module paradigm
                 local subn = tag[i] -- subnode
                 local suba = subn['@']
                 if not (suba and suba.proc) then -- assign the object
-                    subn['*'] = assert(require(cls), 'fail loading '..cls)(o.engine, subn)
+                    subn['*'] = assert(require(cls), 'fail loading '..cls)(subn, o.engine)
                     if we.check(suba.strict) then -- check unused-tag {{{ honor metatable
                         for j = 1, #subn do -- some of them are text/comments:
                             local v = subn[j]
@@ -158,7 +158,7 @@ local XmlObject = class { -- class module paradigm
 }
 
 -- {{{ ==================  demo and self-test (QA)  =======================
-local q = XmlObject(nil, lom({{['.'] = 'T', ' F  '; {['.'] = 'T', '8 '}},})) -- nil engine
+local q = XmlObject(lom({{['.'] = 'T', ' F  '; {['.'] = 'T', '8 '}},})) -- nil engine
 if -- failing conditins:
     q:XmlValue('T[0]')[1] ~= ' F  '
     or q:XmlElement('T[2]')[1][2][1] ~= '8 '

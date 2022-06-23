@@ -3,8 +3,8 @@
 XML is wacky and verbose. To parse an xml file to a lua table
 and be able to recover it back to the orignal xml, it needs some design.
 Our design is pretty much the same as the document object model
-in luaExpat's lxp.lom; however, we use OOP to add structures
-and functionality on our dom.
+in luaExpat's `lxp.lom`; however, we use OOP to add structures
+and functionalities on our dom.
 
 ```html
 <tag>
@@ -19,7 +19,7 @@ and functionality on our dom.
 </tag>
 ```
 
-stored as a lua table (doc):
+lox will convert it as a lua table (doc):
 
 ```lua
 { ['.'] = 'tag',
@@ -59,7 +59,7 @@ Module `lom.lua` uses `pool.lua` and `us.lua` to create 'doc' objects
 ```lua
 lom = require('lom')
 
-doc1 = lom('/path/to/file.xml' or '')   -- doc object
+doc1 = lom('/path/to/file.xml')   -- doc object
 
 doc2 = lom('')
 doc2:parse(xmltxt_1)
@@ -97,7 +97,7 @@ class {
 }
 ```
 
-Calling `lom` with everything eles will trigger the **buildxlink** procedure, which will build the xpointer links:
+Calling `lom` with everything else will trigger the **buildxlink** procedure, which will build the xpointer links:
 
 ```lua
 lom(true)
@@ -144,6 +144,15 @@ xpath and xlinks can be shown in following cross-linked xml files
 The `lom` will parse these 2 files and then build the xlink:
 
 ```lua
+lom = require('lom')
+we = require('us')
+
+doc_a = lom('a.xml')
+doc_b = lom('b.xml')
+lom(true) -- build the links
+
+print(doc_b:drop())
+
 {
     {
         {["."] = "aa"},
@@ -162,6 +171,13 @@ The `lom` will parse these 2 files and then build the xlink:
 }
 ```
 
+Lox's dom sometimes has a tag link entry, which is a table and contains `["&"][0]`. It is the time-stamp for building xlinks.
+
+
+### xpath examples
+
+
+
 
 ## XmlObject
 
@@ -173,3 +189,13 @@ Attribute `proc` invoke module/class instantiation.
 
 where `module1.lua` will return another *derived* XmlObject class.
 
+```lua
+lom = require('lom')
+we = require('us')
+XmlObject = require('XmlObject')
+
+doc = lom('doc.xml')
+lom(true) -- build the links
+
+x = XmlObject(doc)
+```
