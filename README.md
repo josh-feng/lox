@@ -169,12 +169,23 @@ print(doc_b:drop())
         ["."] = "b"
     }
 }
+
+print(doc_b:select('b/c'):drop())
+
+{
+    {
+        ["&"] = {{"we", ["."] = "b"}, {"us", ["."] = "b"}, 0 = 0.84018771676347},
+        ["."] = "c",
+        ["@"] = {"xlink:href", ["xlink:href"] = "a.xml#xpointer(/a/b)"}
+    }
+}
 ```
 
 Lox's dom sometimes has a tag link entry, which is a table and contains `["&"][0]`. It is the time-stamp for building xlinks.
 
+Lox's dom support the following methods: `parse`, `xpath`, `drop`, and `select`.
 
-### xpath examples
+### Examples
 
 
 
