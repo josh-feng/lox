@@ -23,6 +23,9 @@ local lom = {doc = {}} -- doctree for files, user's management {{{
 
 local docs = lom.doc -- xml object list (hidden upvalue)
 
+-- html no end tag
+local singleton = 'area base br col command embed hr img input keygen link meta param source track wbr '
+
 local function starttag (p, name, attr) -- {{{
     local stack = p:getcallbacks().stack
     tinsert(stack, {['.'] = name, ['@'] = #attr > 0 and attr or nil})
@@ -215,11 +218,12 @@ local dom = class { -- lua document object model {{{
                 if k ~= 0 then o[k] = v end -- new data setting
             end
         elseif type(spec) == 'string' then -- '' for text
+            mode = tonumber(mode) or 0
             local p = lxp.new {
                 StartElement = starttag,
                 EndElement = endtag,
-                CharacterData = mode and text or cleantext,
-                Comment = mode and comment or nil,
+                CharacterData = mode < 1 and text or cleantext,
+                Comment = mode < 1 and comment or nil,
                 _nonstrict = true,
                 stack = {o} -- {{}}
             }
@@ -229,12 +233,19 @@ local dom = class { -- lua document object model {{{
                 o.parse = parse
             else
                 local file, msg = io.open(spec, 'r')
-                if file then
-                    local status, msg, line, col, pos = p:parse(file:read('*all'))
+                if file then -- clean up xml/html mess
+                    msg = strgsub(file:read('*all'), '&nbsp;', '')
                     file:close()
+                    msg = strgsub(strgsub(msg, '<script[^>]*>%s*</script>', ''),
+                        '<script([^>]*)>(.-)</script>', '<script%1><![CDATA[%2]]></script>')
+                    if mode > 0 then -- html replay no-end tag with />
+                        for st in strgmatch(singleton, '(%S+) ') do
+                            msg = strgsub(msg, '<('..st..'[^>]-)/?>', '<%1 />')
+                        end
+                    end
+                    local status, msg, line, col, pos = p:parse(msg)
                     if status then status, msg, line = p:parse() end
-                    if not status then o['?'] = {msg..' #'..line} end
-                    p:close()
+                    if not status then o['?'] = {msg..' #'..line} else p:close() end
                 else
                     o['?'] = {msg}
                 end
@@ -332,14 +343,14 @@ end; -- }}}
 setmetatable(lom, {
     __metatable = true;
     __tostring = function (c) return we.tbl2str(lom.doc, '\n') end;
-    __call = function (c, spec) -- {{{ dom object creator
+    __call = function (c, spec, mode) -- {{{ dom object creator
         if type(spec) == 'string' then -- '' for incremental text
             spec = we.normpath(spec)
             if docs[spec] then return docs[spec] end
         elseif spec and type(spec) ~= 'table' then -- closing
             return buildxlink() -- TODO error message
         end
-        return dom(spec)
+        return dom(spec, mode)
     end; -- }}}
 })
 -- }}}
@@ -410,7 +421,7 @@ end
 -- ================================================================== --
 -- service for checking object model and demo/debug -- {{{
 if arg and #arg > 0 and strfind(arg[0] or '', 'lom.lua$') then
-    local doc = lom(arg[1] == '-' and '' or arg[1])
+    local doc = lom(arg[1] == '-' and '' or arg[1], arg[1] and strfind(arg[1], '%.html$'))
     if arg[1] == '-' then doc:parse(io.stdin:read('a')):parse() end
     lom(true)
     print(doc['?'] and tconcat(doc['?'], '\n') or doc:drop())
