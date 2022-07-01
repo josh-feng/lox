@@ -23,9 +23,6 @@ local lom = {doc = {}} -- doctree for files, user's management {{{
 
 local docs = lom.doc -- xml object list (hidden upvalue)
 
--- html no end tag
-local singleton = 'area base br col command embed hr img input keygen link meta param source track wbr '
-
 local function starttag (p, name, attr) -- {{{
     local stack = p:getcallbacks().stack
     tinsert(stack, {['.'] = name, ['@'] = #attr > 0 and attr or nil})
@@ -64,17 +61,23 @@ local function parse (o, txt) -- friend function {{{
     return o -- for cascade oop
 end --}}}
 -- ================================================================== --
-local function xPath (c, paths, doc) -- {{{ return doc/xml-node table, ending index
+local function xPath (c, paths, doc, conti) -- {{{ return doc/xml-node table, ending index
+    -- print('=>', c, '('..(paths[c] and paths[c][0] or '')..')', we.var2str(doc), we.var2str(conti))
     local path = paths[c]
-    if (not path) or path[0] == '/' or path[0] == '' or #doc == 0 then return doc, c end
+    if (not path) or path[0] == '/' or path[0] == '' or #doc == 0 then
+        if conti and #conti > 0 then
+            for _, v in ipairs(xPath(1, paths, conti)) do tinsert(doc, v) end
+        end
+        return doc, c
+    end
     -- xpath syntax: NB: xpointer does not have standard treatment
     -- /A/B[@attr="val",@bb='4']
     -- anywhere/A/B[-3]/-2/3
-    local anywhere = strsub(path[0], 1, 1) ~= '/'
-    local tag = anywhere and path[0] or strsub(path[0], 2, #path[0])
+    -- anywhere = strsub(path[0], 1, 1) ~= '/'
+    local tag = (strsub(path[0], 1, 1) ~= '/') and path[0] or strsub(path[0], 2, #path[0])
 
     local idx = tonumber(path)
-    if idx then return xPath(c + 1, paths, {doc[(idx - 1) % #doc + 1]}) end
+    if idx then return xPath(c + 1, paths, {doc[(idx - 1) % #doc + 1]}, conti) end
 
     local autopass = true
     for i = 1, #path do
@@ -90,15 +93,9 @@ local function xPath (c, paths, doc) -- {{{ return doc/xml-node table, ending in
             if type(mt) == 'table' then
                 if mt['.'] == tag and (autopass or we.match(mt['@'], path)) then
                     tinsert(xn, mt)
-                elseif anywhere and (#mt > 0 or mt['&']) then
-                    local mtl = mt['&']
-                    local mtn = mtl and 0
-                    repeat
-                        local sub = xPath(c, paths, mt)
-                        for j = 1, #sub do tinsert(xn, sub[j]) end
-                        if mtn then mtn = mtn < #mtl and mtn + 1 end
-                        mt = mtn and mtl[mtn]
-                    until not mt
+                elseif strsub(paths[1][0], 1, 1) ~= '/' then -- anywhere
+                    conti = conti or {}
+                    tinsert(conti, mt)
                 end
             end
         end
@@ -124,7 +121,7 @@ local function xPath (c, paths, doc) -- {{{ return doc/xml-node table, ending in
         end
         xn = nxn
     end
-    return xPath(c + 1, paths, xn)
+    return xPath(c + 1, paths, xn, conti)
 end -- }}}
 
 local function procXpath (path) -- {{{ XPath language parser
@@ -160,7 +157,7 @@ local function procXpath (path) -- {{{ XPath language parser
             end
             path = strsub(path, 2, #path)
         end
-        tinsert(t, elem)
+        tinsert(t, elem) -- {{[0] = elem, attr1, ...}}...}
     until path == ''
     return t
 end -- }}}
@@ -205,6 +202,9 @@ local function wXml (node) -- {{{
     return strgsub(tconcat(res, '\n'), '\n', '\n  ')..'\n</'..node['.']..'>' -- indent 2
 end -- }}}
 
+-- html no end tag
+local singleton = 'area base br col command embed hr img input keygen link meta param source track wbr'
+
 local dom = class { -- lua document object model {{{
     ['.'] = false; -- tag name
     ['@'] = false; -- attr
@@ -222,7 +222,7 @@ local dom = class { -- lua document object model {{{
             local p = lxp.new {
                 StartElement = starttag,
                 EndElement = endtag,
-                CharacterData = mode < 1 and text or cleantext,
+                CharacterData = mode < 0 and text or cleantext,
                 Comment = mode < 1 and comment or nil,
                 _nonstrict = true,
                 stack = {o} -- {{}}
@@ -237,10 +237,11 @@ local dom = class { -- lua document object model {{{
                     msg = strgsub(file:read('*all'), '&nbsp;', '')
                     file:close()
                     msg = strgsub(strgsub(msg, '<script[^>]*>%s*</script>', ''),
-                        '<script([^>]*)>(.-)</script>', '<script%1><![CDATA[%2]]></script>')
+                        '<script%f[%W]([^>]*)>%s*([^<].-)</script>',
+                        '<script%1><![CDATA[%2]]></script>')
                     if mode > 0 then -- html replay no-end tag with />
-                        for st in strgmatch(singleton, '(%S+) ') do
-                            msg = strgsub(msg, '<('..st..'[^>]-)/?>', '<%1 />')
+                        for st in strgmatch(singleton, '%S+') do
+                            msg = strgsub(msg, '<('..st..'%f[%W][^>]-)/?>', '<%1 />')
                         end
                     end
                     local status, msg, line, col, pos = p:parse(msg)
