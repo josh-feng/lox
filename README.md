@@ -104,6 +104,15 @@ lom(true)
 ```
 
 
+### Non-ending tags
+
+singleton are 
+`area`, `base`, `br`, `col`, `command`, `embed`, `hr`, `img`, `input`, `keygen`, `link`,
+`meta`, `param`, `source`, `track`, `wbr`.
+
+### Escaped characters (in javascript)
+
+`<` and `>`
 
 ## buildxlink / xpath / api
 
@@ -188,6 +197,12 @@ Lox's dom support the following methods: `parse`, `xpath`, `drop`, and `select`.
 ### Examples
 
 
+```lua
+lom = require('lom')
+print(lom('b.xml'):select('d/a'):drop())
+lom(true)
+print(lom('b.xml'):select('d/a'):drop())
+```
 
 
 ## XmlObject
