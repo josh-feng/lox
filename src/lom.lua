@@ -94,8 +94,12 @@ local function xPath (c, paths, doc, conti) -- {{{ return doc/xml-node table, en
                 if mt['.'] == tag and (autopass or we.match(mt['@'], path)) then
                     tinsert(xn, mt)
                 elseif strsub(paths[1][0], 1, 1) ~= '/' then -- anywhere
-                    conti = conti or {}
-                    tinsert(conti, mt)
+                    conti = conti or {} -- reset to 1 to continue
+                    if c == 1 then
+                        for _ = 1, #mt do tinsert(conti, mt[_]) end
+                    else
+                        tinsert(conti, mt)
+                    end
                 end
             end
         end
