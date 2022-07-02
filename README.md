@@ -106,7 +106,7 @@ lom(true)
 
 ### Non-ending tags
 
-singleton are 
+singleton are
 `area`, `base`, `br`, `col`, `command`, `embed`, `hr`, `img`, `input`, `keygen`, `link`,
 `meta`, `param`, `source`, `track`, `wbr`.
 
@@ -197,11 +197,68 @@ Lox's dom support the following methods: `parse`, `xpath`, `drop`, and `select`.
 ### Examples
 
 
+`a.xml`
+
+```html
+<a>
+    <b>we</b>
+    <c />
+    <d />
+    <e>
+    <a>
+        <b a1="r">lom</b>
+    </a>
+    </e>
+    <b>us</b>
+</a>
+```
+
+`b.xml`
+
+```html
+<b>
+    <aa />
+    <c xlink:href="a.xml#xpointer(a/b)" />
+    <d xlink:href="a.xml#xpointer(/a/b/)" />
+</b>
+```
+
 ```lua
 lom = require('lom')
-print(lom('b.xml'):select('d/a'):drop())
+doca = lom('a.xml')
+docb = lom('b.xml')
 lom(true)
-print(lom('b.xml'):select('d/a'):drop())
+print(doca:select('/a/b/'):drop())
+print(doca:select('/a/b'):drop())
+print(doca:select('a/b/'):drop())
+print(doca:select('a/b'):drop())
+print(doca:select('a/b[a1=r]/'):drop())
+print(doca:select('a/b[a1=r]'):drop())
+print(docb:drop())
+
+-->
+{"we", "us"}
+{{"we", ["."] = "b"}, {"us", ["."] = "b"}}
+{"we", "us", "lom"}
+{{"we", ["."] = "b"}, {"us", ["."] = "b"}, {"lom", ["."] = "b", ["@"] = {"a1", a1 = "r"}}}
+{"lom"}
+{{"lom", ["."] = "b", ["@"] = {"a1", a1 = "r"}}}
+{
+    {
+        {["."] = "aa"},
+        {
+            ["&"] = {{"we", ["."] = "b"}, {"us", ["."] = "b"}, {"lom", ["."] = "b", ["@"] = {"a1", a1 = "r"}}, 0 = 0.84018771676347},
+            ["."] = "c",
+            ["@"] = {"xlink:href", ["xlink:href"] = "a.xml#xpointer(a/b)"}
+        },
+        {
+            ["&"] = {"we", "us", 0 = 0.84018771676347},
+            ["."] = "d",
+            ["@"] = {"xlink:href", ["xlink:href"] = "a.xml#xpointer(/a/b/)"}
+        },
+        ["."] = "b"
+    }
+}
 ```
 
 

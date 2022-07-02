@@ -62,9 +62,9 @@ local function parse (o, txt) -- friend function {{{
 end --}}}
 -- ================================================================== --
 local function xPath (c, paths, doc, conti) -- {{{ return doc/xml-node table, ending index
-    -- print('=>', c, '('..(paths[c] and paths[c][0] or '')..')', we.var2str(doc), we.var2str(conti))
-    local path = paths[c]
-    if (not path) or path[0] == '/' or path[0] == '' or #doc == 0 then
+    -- print('=>', c, '('..(paths[2 * c - 1] or '')..')', we.var2str(doc), we.var2str(conti))
+    local path = paths[2 * c - 1]
+    if (not path) or path == '/' or path == '' or #doc == 0 then
         if conti and #conti > 0 then
             for _, v in ipairs(xPath(1, paths, conti)) do tinsert(doc, v) end
         end
@@ -73,15 +73,19 @@ local function xPath (c, paths, doc, conti) -- {{{ return doc/xml-node table, en
     -- xpath syntax: NB: xpointer does not have standard treatment
     -- /A/B[@attr="val",@bb='4']
     -- anywhere/A/B[-3]/-2/3
-    -- anywhere = strsub(path[0], 1, 1) ~= '/'
-    local tag = (strsub(path[0], 1, 1) ~= '/') and path[0] or strsub(path[0], 2, #path[0])
+    -- anywhere = strsub(path, 1, 1) ~= '/'
+    local tag = (strsub(path, 1, 1) ~= '/') and path or strsub(path, 2, #path)
+    path = paths[2 * c]
 
-    local idx = tonumber(path)
+    local idx = tonumber(tag)
     if idx then return xPath(c + 1, paths, {doc[(idx - 1) % #doc + 1]}, conti) end
 
     local autopass = true
-    for i = 1, #path do
-        if autopass then autopass = (type(path[i]) == 'number') else break end
+    if path then
+        for k, v in pairs(path) do
+            if not autopass then break end
+            if k ~= 0 then autopass = (type(k) == 'number') and (type(v) == 'number') end
+        end
     end
 
     local xn = {} -- xml-node (doc)
@@ -93,7 +97,7 @@ local function xPath (c, paths, doc, conti) -- {{{ return doc/xml-node table, en
             if type(mt) == 'table' then
                 if mt['.'] == tag and (autopass or we.match(mt['@'], path)) then
                     tinsert(xn, mt)
-                elseif strsub(paths[1][0], 1, 1) ~= '/' then -- anywhere
+                elseif strsub(paths[1], 1, 1) ~= '/' then -- start from anywhere?
                     conti = conti or {} -- reset to 1 to continue
                     if c == 1 then
                         for _ = 1, #mt do tinsert(conti, mt[_]) end
@@ -107,7 +111,7 @@ local function xPath (c, paths, doc, conti) -- {{{ return doc/xml-node table, en
         doc = docn and docl[docn]
     until not doc
 
-    if #path > 0 and #xn > 0 then -- collect the indixed table
+    if path and #path > 0 and #xn > 0 then -- collect the indixed table
         local nxn = {}
         for i = 1, #path do
             if type(path[i]) == 'number' then
@@ -117,7 +121,7 @@ local function xPath (c, paths, doc, conti) -- {{{ return doc/xml-node table, en
         if #nxn ~= 0 then xn = nxn end -- collected
     end
     -- not final: break to further search
-    if #xn > 0 and c ~= #paths and path ~= '' then
+    if #xn > 0 and (2 * c) ~= #paths and tag ~= '' then
         local nxn = {}
         for i = 1, #xn do
             local mt = xn[i]
@@ -134,8 +138,9 @@ local function procXpath (path) -- {{{ XPath language parser
     repeat
         local elem, attr
         elem, path = strmatch(path, '^(/?[%w_:]*)(.*)$')
-        elem = {[0] = elem}
+        tinsert(t, elem)
         if strsub(path, 1, 1) == '[' then
+            elem = {}
             while strsub(path, 1, 1) ~= ']' do
                 attr, path = strmatch(strsub(path, 2, #path), '^([_%w]*)(.*)$')
                 local c = strsub(path, 1, 1)
@@ -160,9 +165,12 @@ local function procXpath (path) -- {{{ XPath language parser
                 if #path < 1 then error('Wrong attr setting', 2) end
             end
             path = strsub(path, 2, #path)
+        else
+            elem = false
         end
-        tinsert(t, elem) -- {{[0] = elem, attr1, ...}}...}
+        tinsert(t, elem) -- {elem, false; elem, {attr1, ...}; ...}
     until path == ''
+    -- print('path =', we.var2str(t)) -- debug
     return t
 end -- }}}
 -- ================================================================== --
