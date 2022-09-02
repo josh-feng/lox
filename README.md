@@ -1,4 +1,4 @@
-# lox (lua object model for xml)
+# lox (lua object model for x/html)
 
 XML is wacky and verbose. To parse an xml file to a lua table
 and be able to recover it back to the orignal xml, it needs some design.
@@ -109,6 +109,13 @@ lom(true)
 singleton are
 `area`, `base`, `br`, `col`, `command`, `embed`, `hr`, `img`, `input`, `keygen`, `link`,
 `meta`, `param`, `source`, `track`, `wbr`.
+
+### Boolean attributes
+
+HTML attributes with no values will confuse the luaexpat.
+
+`allowfullscreen`, `async`, `autofocus`, `autoplay`, `checked`, `controls`, `default`, `defer`, `disabled`, `formnovalidate`, `ismap`, `itemscope`, `loop`, `multiple`, `muted`, `nomodule`, `novalidate`, `open`, `playsinline`, `readonly`, `required`, `reversed`, `selected`, `truespeed`
+
 
 ### Escaped characters (in javascript)
 
@@ -228,21 +235,14 @@ lom = require('lom')
 doca = lom('a.xml')
 docb = lom('b.xml')
 lom(true)
-print(doca:select('/a/b/'):drop())
-print(doca:select('/a/b'):drop())
-print(doca:select('a/b/'):drop())
-print(doca:select('a/b'):drop())
-print(doca:select('a/b[a1=r]/'):drop())
-print(doca:select('a/b[a1=r]'):drop())
+print(doca:select('/a/b/'):drop())      --> {"we", "us"}
+print(doca:select('/a/b'):drop())       --> {{"we", ["."] = "b"}, {"us", ["."] = "b"}}
+print(doca:select('a/b/'):drop())       --> {"we", "us", "lom"}
+print(doca:select('a/b'):drop())        --> {{"we", ["."] = "b"}, {"us", ["."] = "b"}, {"lom", ["."] = "b", ["@"] = {"a1", a1 = "r"}}}
+print(doca:select('a/b[a1=r]/'):drop()) --> {"lom"}
+print(doca:select('a/b[a1=r]'):drop())  --> {{"lom", ["."] = "b", ["@"] = {"a1", a1 = "r"}}}
 print(docb:drop())
-
 -->
-{"we", "us"}
-{{"we", ["."] = "b"}, {"us", ["."] = "b"}}
-{"we", "us", "lom"}
-{{"we", ["."] = "b"}, {"us", ["."] = "b"}, {"lom", ["."] = "b", ["@"] = {"a1", a1 = "r"}}}
-{"lom"}
-{{"lom", ["."] = "b", ["@"] = {"a1", a1 = "r"}}}
 {
     {
         {["."] = "aa"},
