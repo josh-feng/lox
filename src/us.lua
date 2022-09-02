@@ -258,7 +258,7 @@ we.check = function (v) -- {{{ -- check v is true or false
 end -- }}}
 -- ================================================================== --
 local function var2str (value, key, ctrl) -- {{{ emit variables in lua
-    key = (type(key) == 'string' and strfind(key, '%W')) and '["'..key..'"]' or key
+    key = (type(key) == 'string' and strfind(key, '[^_%w]')) and '["'..key..'"]' or key
     local assign = type(key) == 'number' and '' or key..' = '
     if type(value) == 'number' then return assign..value end
     if type(value) == 'string' then return assign..'"'..strgsub(value, '"', '\\"')..'"' end
