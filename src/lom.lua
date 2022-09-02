@@ -10,6 +10,7 @@
 --      xmltxt = doc:drop(1)
 -- ================================================================== --
 local lxp = require('lxp') -- the standard Lua Expat module
+-- local lxp = require('lsmp') -- TODO the standard Lua Expat module
 local class = require('pool') -- https://github.com/josh-feng/pool.git
 local we = require('us') -- working environment
 
