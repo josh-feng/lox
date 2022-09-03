@@ -1,5 +1,5 @@
 #######################################################################
-# Lua Simple Markup Parser (to replace lxp)
+# Lua Simple/Sloppy Markup Parser (to replace lxp)
 PROJECT = lsmp
 LIBNAME = $(PROJECT).so
 
@@ -30,7 +30,7 @@ LF += $(LFLAGS)
 
 lib: $(LIBNAME)
 
-$(LIBNAME):
+$(LIBNAME): $(PROJECT)/*
 	$(CC) $(CF) -o $@ $(PROJECT)/lsmp.c $(LF)
 
 install:

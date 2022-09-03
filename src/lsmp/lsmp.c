@@ -61,7 +61,9 @@ enum MPState {  // state machin
   MPSstring     // state while reading a string
 };
 
-SML_Parser SML_ParserCreate (void *p) {
+SML_Parser SML_ParserCreate (void *opt) {
+  SML_Parser p = (SML_Parser) malloc(sizeof(struct SML_ParserStruct));
+  return p;
 }
 
 /*
@@ -80,10 +82,10 @@ SML_ParserFree
 #include "lua.h"
 #include "lauxlib.h"
 
-#if (LUA_VERSION_NUM >= 54)
-#define lua_newuserdata(L, u)  lua_newuserdatauv(L, u, 1)
-#define lua_setuservalue(L, i) lua_setiuservalue(L, i, 1)
-#define lua_getuservalue(L, i) lua_getiuservalue(L, i, 1)
+#if (LUA_VERSION_NUM >= 540)
+#define lua_newuserdata(L, u)    lua_newuserdatauv(L, u, 1)
+#define lua_setuservalue(L, i)   lua_setiuservalue(L, i, 1)
+#define lua_getuservalue(L, i)   lua_getiuservalue(L, i, 1)
 #endif
 
 
@@ -145,54 +147,57 @@ static int getHandle (lsmp_ud *mpu, const char *handle) {
 
 /*********** SAX event driven ***********/
 
-SML_CharDataHdlr f_CharData (void *ud, const char *s, int len) {
+void f_CharData (void *ud, const char *s, int len) {
   lsmp_ud *mpu = (lsmp_ud *) ud;
-  if (mpu->state == MPSok) {
-    if (getHandle(mpu, CharDataKey) == 0) return;  /* no handle */
-    if (mpu->fNoBuffer == 0) {
-      mpu->state = MPSstring;
-      luaL_buffinit(mpu->L, mpu->b);
-    } else {
-      lua_pushlstring(mpu->L, s, len);
-      docall(mpu, 1, 0);
+  if (getHandle(mpu, CharDataKey)) {
+    if (mpu->state == MPSok) {
+      if (mpu->fNoBuffer == 0) {
+        mpu->state = MPSstring;
+        luaL_buffinit(mpu->L, mpu->b);
+      } else {
+        lua_pushlstring(mpu->L, s, len);
+        docall(mpu, 1, 0);
+      }
     }
+    if (mpu->state == MPSstring) luaL_addlstring(mpu->b, s, len);
   }
-  if (mpu->state == MPSstring) luaL_addlstring(mpu->b, s, len);
 }
 
-SML_CommentHdlr f_Comment (void *ud, const char *data) {
+void f_Comment (void *ud, const char *data) {
   lsmp_ud *mpu = (lsmp_ud *) ud;
-  if (getHandle(mpu, CommentKey) == 0) return;  /* no handle */
-  lua_pushstring(mpu->L, data);
-  docall(mpu, 1, 0);
+  if (getHandle(mpu, CommentKey)) {
+    lua_pushstring(mpu->L, data);
+    docall(mpu, 1, 0);
+  }
 }
 
-SML_StartElementHdlr f_StartElement (void *ud, const char *name, const char **attrs) {
+void f_StartElement (void *ud, const char *name, const char **attrs) {
   lsmp_ud *mpu = (lsmp_ud *) ud;
-  lua_State *L = mpu->L;
-  int lastspec = XML_GetSpecifiedAttributeCount(mpu->parser) / 2;
-  int i = 1;
-  if (getHandle(mpu, StartElementKey) == 0) return;  /* no handle */
-  lua_pushstring(L, name);
-  lua_newtable(L);
-  while (*attrs) {
-    if (i <= lastspec) {
+  if (getHandle(mpu, StartElementKey)) {
+    lua_State *L = mpu->L;
+    lua_pushstring(L, name);
+    lua_newtable(L);
+    int i = 1;
+    while (*attrs) {
       lua_pushinteger(L, i++);
       lua_pushstring(L, *attrs);
       lua_settable(L, -3);
+      if (*(attrs + 1)) {
+        lua_pushstring(L, *attrs++);
+        lua_pushstring(L, *attrs++);
+        lua_settable(L, -3);
+      }
     }
-    lua_pushstring(L, *attrs++);
-    lua_pushstring(L, *attrs++);
-    lua_settable(L, -3);
+    docall(mpu, 2, 0);  /* call function with self, name, and attributes */
   }
-  docall(mpu, 2, 0);  /* call function with self, name, and attributes */
 }
 
-SML_EndElementHdlr f_EndElement (void *ud, const char *name) {
+void f_EndElement (void *ud, const char *name) {
   lsmp_ud *mpu = (lsmp_ud *) ud;
-  if (getHandle(mpu, EndElementKey) == 0) return;  /* no handle */
-  lua_pushstring(mpu->L, name);
-  docall(mpu, 1, 0);
+  if (getHandle(mpu, EndElementKey)) {
+    lua_pushstring(mpu->L, name);
+    docall(mpu, 1, 0);
+  }
 }
 
 
