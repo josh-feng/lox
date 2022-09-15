@@ -2,69 +2,103 @@
 #ifndef __lsmp_h
 #define __lsmp_h
 
+#include <stdio.h>
+
+typedef uint32_t DWORD;
+typedef uint16_t WORD;
+typedef uint8_t  BYTE;
+
 #define StartCdataKey     "StartCdataSection"
 #define EndCdataKey       "EndCdataSection"
+#define SchemeKey     "Scheme"
 #define CharDataKey       "CharData"
 #define CommentKey        "Comment"
 #define StartElementKey   "StartElement"
 #define EndElementKey     "EndElement"
 
-#define M_strict    0x00
+enum MPState { /* parser status */
+  MPSpre,      /* initialized */
+  MPSok,       /* state while parsing */
+  MPSstring,   /* state while reading a string */
+  MPSfinished, /* state after finished parsing */
+  MPSerror
+};
+
+#define M_STRICT    0x00
+#define M_ESCAPE    0x01 /* \< \> \" \' */
+#define M_SLOPPY    0x02 /* < > */
+#define M_quotation 0x04 /* flexible ".." '..' */
+#define M_ANYTAG    0x08 /* any tag */
+#define M_MODES     0x0F
+
+#define S_TEXT      0x00
+#define S_CDATA     0x10 /* CDATA and COMMENT */
+#define S_MARKUP    0x20
+#define S_CSCHEM    0x30
+#define S_STRING    0x40 /* in MARKUP */
+#define S_ERROR     0x50
+#define S_DONE      0x60
+#define S_STATES    0x70
+
+#define F_TOKEN     0x80 /* got tag name */
 
 typedef void (*SML_StartElementHdlr) (void *ud, const char *name, const char **atts);
 typedef void (*SML_EndElementHdlr)   (void *ud, const char *name);
 typedef void (*SML_CharDataHdlr)     (void *ud, const char *s, int len);
 typedef void (*SML_CommentHdlr)      (void *ud, const char *s, int len);
+typedef void (*SML_SchemeHdlr)       (void *ud, const char *s, int len);
+
+typedef struct GlnkStruct {
+  GlnkStruct *next;
+  void *data;
+} Glnk;
 
 typedef struct SML_ParserStruct {
   void *ud; /* userdata */
   char *buf;
-  unsigned int r, c; /* row and column */
-  unsigned int i;    /* byte index */
-  SML_CharDataHdlr     fd;
-  SML_StartElementHdlr fs;
-  SML_EndElementHdlr   fe;
-  SML_CommentHdlr      fc;
-  int mode;
-  const char *encoding;
-  const char *singletons; /* strstr */
+  unsigned int len, size;
+  unsigned int r, c, i; /* row, column, byte index */
+  SML_CharDataHdlr     ft; /* text <!CDATA[ ]]> */
+  SML_StartElementHdlr fs; /* markup tag start */
+  SML_EndElementHdlr   fe; /* markup tag end */
+  SML_CommentHdlr      fc; /* comment */
+  SML_SchemeHdlr       fd; /* markup definition <!-- --> */
+  BYTE mode; /* mode + state */
+  char quote;
+  BYTE iScm; /* == Scms if no */
+  BYTE Scms; /* 255 */
+  const char **szScm; /* pair <? ?> */
+  char *elem;
+  Glnk *attr;
 } *SML_Parser;
-
-enum MPState { /* parser status */
-  MPSpre,      /* initialized */
-  MPSok,       /* state while parsing */
-  MPSfinished, /* state after finished parsing */
-  MPSerror,
-  MPSstring    /* state while reading a string */
-};
 
 /* markup <...> / text ...
 
-  0x00 strict 
-  0x01 escape    \\ \< \> \" \' \x         
-  0x02 space     <_ _>
-  0x04 quotation dominant ".." '..'
-  0x08 
-  0x10 
-  0x20 
-  0x40 
-  0x80 
- 
   <..1<..2>  0x00/q  <..1<..2>
   <..1>..2>  0x00/q  <..1> and ..2>
 
-  MPSpre -> quote -> MPSok
-         -> text  -> MPSok
-         -> tag   -> MPSok
-  MPSstring ->
-  MPSok
+  MPSpre   -> <     -> MPSok
+  MPSok    -> quote -> MPSstring
+           -> >     -> MPSpre
+  MPString -> quote -> MPSok
   MPSerror
   MPSfinished
+
+  '<' ==>
+       '!'
+           '[CDATA[' ==> S_CDATA
+               ']]>' ==> S_TEXT
+           '--' ==> S_CDATA
+               '-->' ==> S_TEXT
+       tokens: ==> S_MARKUP
+           '"' ==> S_STRING ==> '"' ==> S_MARKUP
+           '>' ==> S_TEXT
 */
 
 /*
 void SML_SetElementHdlr  (SML_Parser, SML_StartElementHdlr, SML_EndElementHdlr);
 void SML_SetCharDataHdlr (SML_Parser, SML_CharDataHdlr);
+void SML_SetCommentHdlr  (SML_Parser, SML_CommentHdlr);
 void SML_SetCommentHdlr  (SML_Parser, SML_CommentHdlr);
 */
 
