@@ -8,13 +8,12 @@ typedef uint32_t DWORD;
 typedef uint16_t WORD;
 typedef uint8_t  BYTE;
 
-#define StartCdataKey     "StartCdataSection"
-#define EndCdataKey       "EndCdataSection"
-#define SchemeKey     "Scheme"
-#define CharDataKey       "CharData"
-#define CommentKey        "Comment"
 #define StartElementKey   "StartElement"
 #define EndElementKey     "EndElement"
+#define CharDataKey       "CharData"
+#define CommentKey        "Comment"
+#define ExtensionKey      "Extension"
+#define SchemeKey         "Scheme"
 
 enum MPState { /* parser status */
   MPSpre,      /* initialized */
@@ -26,13 +25,13 @@ enum MPState { /* parser status */
 
 #define M_STRICT    0x00
 #define M_ESCAPE    0x01 /* \< \> \" \' */
-#define M_SLOPPY    0x02 /* < > */
-#define M_quotation 0x04 /* flexible ".." '..' */
-#define M_ANYTAG    0x08 /* any tag */
+#define M_SLOPPY    0x02 /* <_ _> */
+#define M_QUOTES    0x04 /* flexible ".." '..' */
+#define M_ANYTAG    0x08 /* other/non-standard tag [] */
 #define M_MODES     0x0F
 
 #define S_TEXT      0x00
-#define S_CDATA     0x10 /* CDATA and COMMENT */
+#define S_CDATA     0x10 /* CDATA, COMMENT, and Extension*/
 #define S_MARKUP    0x20
 #define S_CSCHEM    0x30
 #define S_STRING    0x40 /* in MARKUP */
@@ -46,7 +45,8 @@ typedef void (*SML_StartElementHdlr) (void *ud, const char *name, const char **a
 typedef void (*SML_EndElementHdlr)   (void *ud, const char *name);
 typedef void (*SML_CharDataHdlr)     (void *ud, const char *s, int len);
 typedef void (*SML_CommentHdlr)      (void *ud, const char *s, int len);
-typedef void (*SML_SchemeHdlr)       (void *ud, const char *s, int len);
+typedef void (*SML_ExtensionHdlr)    (void *ud, const char *s, int len);
+typedef void (*SML_SchemeHdlr)       (void *ud, const char *name, const char **atts);
 
 typedef struct GlnkStruct {
   GlnkStruct *next;
@@ -61,13 +61,17 @@ typedef struct SML_ParserStruct {
   SML_CharDataHdlr     ft; /* text <!CDATA[ ]]> */
   SML_StartElementHdlr fs; /* markup tag start */
   SML_EndElementHdlr   fe; /* markup tag end */
-  SML_CommentHdlr      fc; /* comment */
-  SML_SchemeHdlr       fd; /* markup definition <!-- --> */
+  SML_CommentHdlr      fc; /* comment <!-- --> */
+  SML_SchemeHdlr       fd; /* definition <! [] > */
+  SML_ExtensionHdlr    fx; /* extension <? ?> */
+
   BYTE mode; /* mode + state */
   char quote;
-  BYTE iScm; /* == Scms if no */
-  BYTE Scms; /* 255 */
-  const char **szScm; /* pair <? ?> */
+
+  BYTE iExt; /* == Exts if no */
+  BYTE Exts; /* 255 */
+  const char **szExts; /* pair <? ?> */
+
   char *elem;
   Glnk *attr;
 } *SML_Parser;

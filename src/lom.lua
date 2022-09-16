@@ -1,6 +1,6 @@
 #!/usr/bin/env lua
 -- ================================================================== --
--- LOM (Lua Object Model): on top of 'lxp'
+-- LOM (Lua Object Model):
 -- DOM: doc = {['.'] = tag; ['@'] = {}; ['&'] = {{}..}; '\0comment', ...}
 -- Usage example:
 --      lom = require('lom')
@@ -9,8 +9,6 @@
 --      lom(true) -- buildxlink
 --      xmltxt = doc:drop(1)
 -- ================================================================== --
-local lxp = require('lxp') -- the standard Lua Expat module
--- local lxp = require('lsmp') -- TODO the standard Lua Expat module
 local class = require('pool') -- https://github.com/josh-feng/pool.git
 local we = require('us') -- working environment
 
@@ -20,7 +18,11 @@ local strrep, strgsub, strfind = string.rep, string.gsub, string.find
 local tinsert, tremove, tconcat = table.insert, table.remove, table.concat
 local mmin = math.min
 -- ================================================================== --
-local lom = {doc = {}} -- doctree for files, user's management {{{
+local lom = { -- doctree for files, user's management {{{
+    doc = {};
+    mp = require('lxp') -- the standard Lua Expat module
+-- require('lsmp') -- TODO the standard Lua Expat module
+}
 
 local docs = lom.doc -- xml object list (hidden upvalue)
 
@@ -55,7 +57,7 @@ local function parse (o, txt) -- friend function {{{
     local status, msg, line, col, pos = p:parse(txt) -- pass nil if failed
     if not (txt and status) then
         if not status then o['?'] = {msg..' #'..line} end
-        p:close() -- seems destroy the lxp obj
+        p:close() -- seems destroy the mp obj
         o[0] = nil
         o.parse = nil
     end
@@ -232,7 +234,7 @@ local dom = class { -- lua document object model {{{
             end
         elseif type(spec) == 'string' then -- '' for text
             mode = tonumber(mode) or 0
-            local p = lxp.new {
+            local p = lom.mp.new {
                 StartElement = starttag,
                 EndElement = endtag,
                 CharacterData = mode < 0 and text or cleantext,
