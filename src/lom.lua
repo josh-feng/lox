@@ -439,7 +439,7 @@ end
 if arg and #arg > 0 and strfind(arg[0] or '', 'lom.lua$') then
     local doc = lom(arg[1] == '-' and '' or arg[1], arg[1] and strfind(arg[1], '%.html$'))
     if arg[1] == '-' then doc:parse(io.stdin:read('a')):parse() end
-    lom(true)
+    -- lom(true)
     print(doc['?'] and tconcat(doc['?'], '\n') or doc:drop())
 end -- }}}
 

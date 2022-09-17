@@ -100,7 +100,7 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len, int fEnd) {
     if (p->size < p->len + len) p->buf = (char *) realloc(p->buf, p->size = p->len + len);
     memcpy(p->buf + p->len, s, len);
   }
-  if ((p->mode & S_STATES == S_TEXT) && p->len && p->buf[p->len] == '<') {
+  if (((p->mode & S_STATES) == S_TEXT) && p->len && p->buf[p->len] == '<') {
     p->len--;
     len++;
   }
@@ -115,7 +115,7 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len, int fEnd) {
       case S_TEXT: /* text */
         while (c != e) {
           if (*c != '<' ||
-              (escape && (((c == s) && bc == '\') || ((c != s) && *(c - 1) == '\'))) ||
+              (escape && (((c == s) && bc == '\\') || ((c != s) && *(c - 1) == '\\'))) ||
               ((c + 1 != e) && (bc = *(c + 1)) && sloppy && /* !good tag */
                 !(bc == '!' || bc == '/' || bc == '?' || bc == '_' ||
                   (bc >= 'A' && bc <= 'Z') || (bc >= 'a' && bc <= 'z')))
@@ -161,13 +161,13 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len, int fEnd) {
             }
             else if (*c == '>') {
               if (p->elem[0] == '!') { /* TODO <!.. ...> */
-                p->fd(p->ud, s, c - s);
+                /* p->fd(p->ud, s, c - s); */
               }
               else if (p->elem[0] == '/') { /* TODO clean attribute */
                 p->fe(p->ud, s);
               }
               else { /* TODO <*.. ...> */
-                p->fs(p->ud, s, c - s);
+                /* p->fs(p->ud, s, c - s); */
               }
             }
             c++;
@@ -181,7 +181,7 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len, int fEnd) {
               s = ++c;
               break;
             }
-            else if (bc = *c && (bc <= ' ' || (bc > '~' && bc <= 0x7F))) { /* space */
+            else if ((bc = *c) && (bc <= ' ' || (bc > '~' && bc <= 0x7F))) { /* space */
               int i, n = c - s;
               for (i = 0; i < p->Exts; i++)
                 if (strncmp(s, p->szExts[2 * i], n) == 0) break;
@@ -256,7 +256,7 @@ int SML_szArray (const char ***psz, const char *sz) {
   char **p = (char **) malloc((size_t) ++c);
   *psz = (const char **) p;
   *p++ = s = (char *) malloc((size_t) (s - sz));
-  while (*s++ = *sz++) if (*(s - 1) == ' ') *((**p++ = s) - 1) = '\0';
+  while ((*s++ = *sz++)) if (*(s - 1) == ' ') *((*p++ = s) - 1) = '\0';
   return c;
 }
 
@@ -339,6 +339,10 @@ void f_Extension (void *ud, const char *s, int len) {
     lua_pushlstring(mpu->L, s, len);
     docall(mpu, 1 + 1, 0);
   }
+}
+
+void f_Schemes (void *ud, const char *name, const char **attrs) {
+  stGlnkPush(NULL);
 }
 
 void f_StartElement (void *ud, const char *name, const char **attrs) {
@@ -467,7 +471,8 @@ static int lsmp_creator (lua_State *L) {
   p->fs = f_StartElement;
   p->fe = f_EndElement;
   p->fc = f_Comment;
-  p->fd = f_Extension; /* Exteme */
+  p->fd = f_Schemes;
+  p->fx = f_Extension; /* Exteme */
   return 1;
 }
 

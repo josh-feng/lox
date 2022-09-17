@@ -4,9 +4,9 @@
 
 #include <stdio.h>
 
-typedef uint32_t DWORD;
-typedef uint16_t WORD;
-typedef uint8_t  BYTE;
+typedef __uint32_t DWORD;
+typedef __uint16_t WORD;
+typedef __uint8_t  BYTE;
 
 #define StartElementKey   "StartElement"
 #define EndElementKey     "EndElement"
@@ -48,10 +48,8 @@ typedef void (*SML_CommentHdlr)      (void *ud, const char *s, int len);
 typedef void (*SML_ExtensionHdlr)    (void *ud, const char *s, int len);
 typedef void (*SML_SchemeHdlr)       (void *ud, const char *name, const char **atts);
 
-typedef struct GlnkStruct {
-  GlnkStruct *next;
-  void *data;
-} Glnk;
+typedef struct Glnk Glnk;
+struct Glnk { Glnk *next; void *data; };
 
 typedef struct SML_ParserStruct {
   void *ud; /* userdata */
@@ -75,36 +73,6 @@ typedef struct SML_ParserStruct {
   char *elem;
   Glnk *attr;
 } *SML_Parser;
-
-/* markup <...> / text ...
-
-  <..1<..2>  0x00/q  <..1<..2>
-  <..1>..2>  0x00/q  <..1> and ..2>
-
-  MPSpre   -> <     -> MPSok
-  MPSok    -> quote -> MPSstring
-           -> >     -> MPSpre
-  MPString -> quote -> MPSok
-  MPSerror
-  MPSfinished
-
-  '<' ==>
-       '!'
-           '[CDATA[' ==> S_CDATA
-               ']]>' ==> S_TEXT
-           '--' ==> S_CDATA
-               '-->' ==> S_TEXT
-       tokens: ==> S_MARKUP
-           '"' ==> S_STRING ==> '"' ==> S_MARKUP
-           '>' ==> S_TEXT
-*/
-
-/*
-void SML_SetElementHdlr  (SML_Parser, SML_StartElementHdlr, SML_EndElementHdlr);
-void SML_SetCharDataHdlr (SML_Parser, SML_CharDataHdlr);
-void SML_SetCommentHdlr  (SML_Parser, SML_CommentHdlr);
-void SML_SetCommentHdlr  (SML_Parser, SML_CommentHdlr);
-*/
 
 #define SML_GetCurrentLineNumber(p)     ((p)->r)
 #define SML_GetCurrentColumnNumber(p)   ((p)->c)
