@@ -2,6 +2,7 @@
 The first part is solely SML parser, it can be used without lua
 The second part is for lua module, and shows a usage example of the first part
 */
+#include <stdio.h>
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,6 +30,8 @@ static Glnk *stGlnkPop () {
 }
 
 static void stGlnkPush (Glnk *p) {
+  free(p->data);
+  p->data = NULL;
   p->next = stGlnk; stGlnk = p;
 }
 
@@ -38,17 +41,6 @@ static void stGlnkFree () {
 }
 
 // BNF:
-//
-// '<' ==>
-//      '!'
-//          '[CDATA[' ==> S_CDATA
-//              ']]>' ==> S_TEXT
-//          '--' ==> S_CDATA
-//              '-->' ==> S_TEXT
-//      tokens: ==> S_MARKUP
-//          '"' ==> S_STRING ==> '"' ==> S_MARKUP
-//          '>' ==> S_TEXT
-//
 //
 // process instruction p = lxp.new(callbacks)
 // assert(p:parse[[
@@ -61,17 +53,18 @@ static void stGlnkFree () {
 //  EndElement = endtag,
 //  CharData =
 //  Comment =
+//  Scheme =
 //  Extension =
-//  mode = 0, -- 0/strict, 1/escape, 2/sloppy, 3/quotation-flex
-//  singletons = "",
 //  stack = {o} -- {{}}
+//  singletons = "",
 //
 // NB: https://github.com/lunarmodules/luaexpat/blob/master/src/lxplib.c
 
-SML_Parser SML_ParserCreate (void *opt) {
+SML_Parser SML_ParserCreate (void *ud) {
   SML_Parser p = (SML_Parser) malloc(sizeof(struct SML_ParserStruct));
+  p->ud = ud;
   p->buf = NULL;
-  p->len = p->size = 0;
+  p->len = p->size = p->r = p->c = p->i = 0;
   p->mode = M_STRICT;
   return p;
 }
@@ -85,21 +78,23 @@ const char *SML_ErrorString (SML_Parser p) {
   return NULL;
 }
 
+#define incr(x,p);  switch (*x++) { case '\n': p->r++; p->c = 0; default: p->c++; p->i++; }
+
 /* heurestic smp (sloppy markup parser) */
-/* markup <...> / text ...
+/* markup <...> / text ... (!DOCTYPE [] scheme + quotation) */
+enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
+  if (len && (p->mode & S_STATES) == S_DONE) return MPSerror;
+  BYTE fEnd = (s == NULL);
 
-  !DOCTYPE [] scheme + quotation
-*/
-enum MPState SML_Parse (SML_Parser p, const char *s, int len, int fEnd) {
-  BYTE escape = p->mode & M_ESCAPE;
-  BYTE sloppy = p->mode & M_SLOPPY;
-  BYTE anytag = p->mode & M_ANYTAG; /* !DOCTYPE [] */
-
-  /* merge add to p->buf */
-  if (len) {
+  if (len) { /* merge/add to p->buf */
     if (p->size < p->len + len) p->buf = (char *) realloc(p->buf, p->size = p->len + len);
     memcpy(p->buf + p->len, s, len);
   }
+  else if (!fEnd) {
+    return MPSok;
+  }
+
+  /* adjust last parsed result */
   if (((p->mode & S_STATES) == S_TEXT) && p->len && p->buf[p->len] == '<') {
     p->len--;
     len++;
@@ -110,24 +105,36 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len, int fEnd) {
   char *e = p->buf + (p->len += len);
   char q = p->quote;
 
+  BYTE escape = p->mode & M_ESCAPE;
+  BYTE sloppy = p->mode & M_SLOPPY;
+  BYTE anytag = p->mode & M_ANYTAG; /* !DOCTYPE [] */
+  // printf("%d (%x, %x, %x) %d\n", p->mode, s, c, e, len);
+
   while (c != e) {
     switch (p->mode & S_STATES) {
       case S_TEXT: /* text */
-        while (c != e) {
-          if (*c != '<' ||
-              (escape && (((c == s) && bc == '\\') || ((c != s) && *(c - 1) == '\\'))) ||
-              ((c + 1 != e) && (bc = *(c + 1)) && sloppy && /* !good tag */
-                !(bc == '!' || bc == '/' || bc == '?' || bc == '_' ||
-                  (bc >= 'A' && bc <= 'Z') || (bc >= 'a' && bc <= 'z')))
-             )
-            c++;
-          else
-            break;
+        while ((c != e) && (('<' != *c) ||
+             (escape && (((c == s) && bc == '\\') || ((c != s) && *(c - 1) == '\\'))) ||
+             ((c + 1 != e) && (bc = *(c + 1)) && sloppy && /* !good tag */
+               !(bc == '!' || bc == '/' || bc == '?' || bc == '_' ||
+                 (bc >= 'A' && bc <= 'Z') || (bc >= 'a' && bc <= 'z'))))) {
+          incr(c, p);
         }
         if (c != e) {
-          p->ft(p->ud, s, c - s);
+          if (c != s) {
+            /* p->ft(p->ud, s, c - s); */
+            // printf("(%s)", strndup(s, c - s));
+          }
+          // printf("(%x, %x, %x)\n", s, c, e);
           s = (const char *) c;
           p->mode = (p->mode & M_MODES) | S_MARKUP;
+        }
+        else if (fEnd) {
+          if (c != s) {
+            /* p->ft(p->ud, s, c - s); */
+            // printf("(%s)", s);
+          }
+          p->mode = (p->mode & M_MODES) | S_DONE;
         }
         break;
 
@@ -149,28 +156,35 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len, int fEnd) {
         if (p->mode & F_TOKEN) { /* token found */
           while (c != e) {
             if (*c == q || (!q && (*c == '"' || *c == '\''))) {
-              p->mode = (p->mode & M_MODES) | S_STRING;
-              c++;
-              break;
+              // p->mode = (p->mode & M_MODES) | S_STRING;
+              // break;
             }
-            else if (*c == ' ') { /* space collect attributes TODO */
-              Glnk *attr = stGlnkPop();
-              attr->next = p->attr; p->attr = attr;
-              attr->data = (void *) strndup(s, c - s);
-              s = c + 1;
+            else if (*c == ' ') { /* space collect attributes */
+              if (s != c) {
+                Glnk *attr = stGlnkPop();
+                attr->next = p->attr; p->attr = attr;
+                attr->data = (void *) strndup(s, c - s);
+              }
+              s = (const char *) (c + 1);
             }
             else if (*c == '>') {
-              if (p->elem[0] == '!') { /* TODO <!.. ...> */
+              if (p->elem[0] == '!') { /* <!.. ...> */
                 /* p->fd(p->ud, s, c - s); */
               }
-              else if (p->elem[0] == '/') { /* TODO clean attribute */
-                p->fe(p->ud, s);
+              else if (p->elem[0] == '/') { /* clean attribute */
+                /* p->fe(p->ud, s); */
               }
-              else { /* TODO <*.. ...> */
+              else { /* <*.. ...> */
                 /* p->fs(p->ud, s, c - s); */
               }
+              free(p->elem);
+              p->elem = NULL; // TODO free szExts
+              p->mode = (p->mode & M_MODES) | S_TEXT;
+              incr(c, p);
+              s = (const char *) c;
+              break;
             }
-            c++;
+            incr(c, p);
           }
         }
         else { /* search token */
@@ -178,35 +192,52 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len, int fEnd) {
             if (((c == s + 3) && 0 == strncmp(s, "<!--", 4)) ||
                 ((c == s + 8) && 0 == strncmp(s, "<![CDATA[", 9))) {
               p->mode = (p->mode & M_MODES) | S_CDATA;
-              s = ++c;
+              incr(c, p);
+              s = (const char *) c;
+              printf("COMMENT\n");
               break;
             }
             else if ((bc = *c) && (bc <= ' ' || (bc > '~' && bc <= 0x7F))) { /* space */
               int i, n = c - s;
-              for (i = 0; i < p->Exts; i++)
-                if (strncmp(s, p->szExts[2 * i], n) == 0) break;
-              s++;
+              for (i = 0; i < p->Exts; i++) if (strncmp(s, p->szExts[2 * i], n) == 0) break;
               p->iExt = i;
-              p->elem = strndup(s, c - s);
+              p->elem = strndup(++s, c - s);
               if (i < p->Exts) {
                 p->mode = (p->mode & M_MODES) | S_CDATA;
               }
               else { /* TODO tag */
-                p->mode = (p->mode & M_MODES) | F_TOKEN;
+                p->mode |= F_TOKEN;
                 if (anytag) {
                 }
               }
-              s = ++c;
+              incr(c, p);
+              s = (const char *) c;
+              printf("TOKEN %s\n", p->elem);
               break;
             }
-            c++;
+            else if (bc == '>') {
+              if (c == ++s) { /* TODO <> */
+                p->mode = (p->mode & M_MODES) | S_TEXT;
+              }
+              else { /* TODO <*> */
+                p->mode |= F_TOKEN;
+                p->elem = strndup(s, c - s);
+                printf("TOKEN %s\n", p->elem);
+              }
+              incr(c, p);
+              s = (const char *) c;
+              break;
+            }
+            if (*(c++) == '\n') { p->r++; p->c = 0; }
+            p->c++;
+            p->i++;
           }
         }
         break;
 
       case S_STRING: /* string in tag */
         while (c != e && *c != q) {
-          c++;
+          incr(c, p);
         }
         p->mode = (p->mode & M_MODES) | S_MARKUP;
         break;
@@ -215,49 +246,64 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len, int fEnd) {
         while (c != e) {
           if (*c == '>') {
             if (p->elem) {
-              if (0 == strncmp(c - 2, p->szExts[p->iExt], 3)) {
-                p->fx(p->ud, s, c - s); /* TODO extension */
-                break;
-              }
+              // if (0 == strncmp(c - 2, p->szExts[p->iExt], 3)) {
+              //   p->fx(p->ud, s, c - s); /* TODO extension */
+              //   break;
+              // }
             }
             else if (0 == strncmp(c - 2, "]]>", 3)) {
-              p->ft(p->ud, s, c - s); /* cdata text */
+              // p->ft(p->ud, s, c - s); /* cdata text */
               break;
             }
-            else if ((0 == strncmp(c - 2, "-->", 3)) &&  c > s + 7 ) {
-              p->fc(p->ud, s, c - s); /* comment */
+            else if ((0 == strncmp(c - 2, "-->", 3)) && c > s + 7 ) {
+              // p->fc(p->ud, s, c - s); /* comment */
               break;
             }
           }
-          c++;
+          incr(c, p);
         }
         if (c != e) {
           p->mode = (p->mode & M_MODES) | S_TEXT;
-          s = ++c;
+          incr(c, p);
+          s = (const char *) c;
         }
         break;
     }
   }
 
-  /* realloc p->buf */
+  if (fEnd) {
+    p->mode = (M_MODES & p->mode) | ((c == e) ? S_DONE : S_ERROR);
+    return (c == e) ? MPSfinished : MPSerror;
+  }
   return MPSok;
 }
 
 void SML_ParserFree (SML_Parser p) {
   free(p->buf);
-  p->buf = NULL;
+  if (p->szExts) { free((void *)(*(p->szExts))); free(p->szExts); }
   free(p);
 }
 
 int SML_szArray (const char ***psz, const char *sz) {
   int c = 0;
-  char *s = (char *) sz;
-  while (*s++) if (*s == ' ') c++;
-  char **p = (char **) malloc((size_t) ++c);
-  *psz = (const char **) p;
-  *p++ = s = (char *) malloc((size_t) (s - sz));
-  while ((*s++ = *sz++)) if (*(s - 1) == ' ') *((*p++ = s) - 1) = '\0';
-  return c;
+  if (sz) {
+    char *s = (char *) sz;
+    while (*s) {
+      if (*s <= ' ' || *s > '~') c++;
+      s++;
+    }
+    char **p = (char **) malloc((size_t) ++c);
+    *psz = (const char **) p;
+    *p++ = s = (char *) malloc((size_t) (s - sz));
+    while ((*s++ = *sz)) {
+      if (*sz <= ' ' || *sz > '~') *((*p++ = s) - 1) = '\0';
+      sz++;
+    }
+  }
+  else {
+    *psz = NULL;
+  }
+  return (c >> 1); /* div by 2 for pairs */
 }
 
 /***************************************************************/
@@ -273,10 +319,8 @@ int SML_szArray (const char ***psz, const char *sz) {
 #define lua_getuservalue(L, i)   lua_getiuservalue(L, i, 1)
 #endif
 
-
 #if !defined(lua_pushliteral)
-#define  lua_pushliteral(L, s)  \
-  lua_pushstring(L, "" s, (sizeof(s)/sizeof(char))-1)
+#define lua_pushliteral(L, s)    lua_pushstring(L, "" s, (sizeof(s)/sizeof(char))-1)
 #endif
 
 #define ParserType  "MarkupParser"
@@ -309,7 +353,7 @@ static int getHandle (lsmp_ud *mpu, const char *handle) {
   lua_pushstring(L, handle);
   lua_gettable(L, 3);
   if (!lua_isfunction(L, -1)) {
-    luaL_error(L, "lxp '%s' callback is not a function", handle);
+    luaL_error(L, "lsmp '%s' callback is not a function", handle);
   }
   lua_pushvalue(L, 1);  /* 1st arg (ud) in every call (self) */
   return 1;
@@ -319,7 +363,8 @@ static int getHandle (lsmp_ud *mpu, const char *handle) {
 
 void f_CharData (void *ud, const char *s, int len) {
   lsmp_ud *mpu = (lsmp_ud *) ud;
-  if (getHandle(mpu, CharDataKey) && mpu->state == MPSok) {
+  printf("OK here\n");
+  if (getHandle(mpu, CharacterDataKey) && mpu->state == MPSok) {
     lua_pushlstring(mpu->L, s, len);
     docall(mpu, 1 + 1, 0);
   }
@@ -341,7 +386,7 @@ void f_Extension (void *ud, const char *s, int len) {
   }
 }
 
-void f_Schemes (void *ud, const char *name, const char **attrs) {
+void f_Scheme (void *ud, const char *name, const char **attrs) {
   stGlnkPush(NULL);
 }
 
@@ -384,13 +429,11 @@ static int getcallbacks (lua_State *L) {
 
 static int parse_aux (lua_State *L, lsmp_ud *mpu, const char *s, size_t len) {
   mpu->L = L;
-  lua_settop(L, 2); /* ud + string */
-  mpu->state = SML_Parse(mpu->parser, s, (int) len, s == NULL); /* state */
+  mpu->state = SML_Parse(mpu->parser, s, (int) len); /* state */
   if (mpu->state == MPSerror) {
     lua_rawgeti(L, LUA_REGISTRYINDEX, mpu->errorref);  /* get original msg. */
     lua_error(L);
   }
-  if (s == NULL) mpu->state = MPSfinished;
   if (mpu->state != MPSerror) {
     lua_settop(L, 1);  /* return parser userdata on success */
     return 1;
@@ -457,22 +500,22 @@ static int lsmp_creator (lua_State *L) {
   mpu->L = L;
   mpu->state = MPSpre;
   mpu->errorref = LUA_REFNIL;
-  SML_Parser p = mpu->parser = SML_ParserCreate(NULL);
+  SML_Parser p = mpu->parser = SML_ParserCreate(mpu);
   if (!p) luaL_error(L, "SML_ParserCreate failed");
 
   /* initialize sml parser */
-  p->ud = mpu;
   lua_getfield(L, 1, "mode");
   p->mode = (lua_tointeger(L, -1) & M_MODES) | S_TEXT;
-  lua_getfield(L, 1, "schemes");
-  p->Exts = (WORD) SML_szArray(&(p->szExts), lua_tolstring(L, -1, NULL));
-  p->r = p->c = p->i = 0;
+  lua_remove(L, -1);
+  lua_getfield(L, 1, "extension");
+  p->Exts = (BYTE) SML_szArray(&(p->szExts), lua_tolstring(L, -1, NULL));
+  lua_remove(L, -1);
   p->ft = f_CharData;
   p->fs = f_StartElement;
   p->fe = f_EndElement;
   p->fc = f_Comment;
-  p->fd = f_Schemes;
-  p->fx = f_Extension; /* Exteme */
+  p->fd = f_Scheme;
+  p->fx = f_Extension;
   return 1;
 }
 
@@ -506,7 +549,7 @@ static const struct luaL_Reg lsmp_mt[] = {
   {NULL, NULL}
 };
 
-LUA_API int luaopen_lsmp ( lua_State *L ) {
+LUA_API int luaopen_lsmp (lua_State *L) {
   luaL_newmetatable(L, ParserType); /* parser object/userdata */
   luaL_setfuncs (L, parser_meths, 0);
   lua_pushvalue(L, -1);

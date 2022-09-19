@@ -10,36 +10,10 @@ typedef __uint8_t  BYTE;
 
 #define StartElementKey   "StartElement"
 #define EndElementKey     "EndElement"
-#define CharDataKey       "CharData"
+#define CharacterDataKey  "CharacterData"
 #define CommentKey        "Comment"
 #define ExtensionKey      "Extension"
 #define SchemeKey         "Scheme"
-
-enum MPState { /* parser status */
-  MPSpre,      /* initialized */
-  MPSok,       /* state while parsing */
-  MPSstring,   /* state while reading a string */
-  MPSfinished, /* state after finished parsing */
-  MPSerror
-};
-
-#define M_STRICT    0x00
-#define M_ESCAPE    0x01 /* \< \> \" \' */
-#define M_SLOPPY    0x02 /* <_ _> */
-#define M_QUOTES    0x04 /* flexible ".." '..' */
-#define M_ANYTAG    0x08 /* other/non-standard tag [] */
-#define M_MODES     0x0F
-
-#define S_TEXT      0x00
-#define S_CDATA     0x10 /* CDATA, COMMENT, and Extension*/
-#define S_MARKUP    0x20
-#define S_CSCHEM    0x30
-#define S_STRING    0x40 /* in MARKUP */
-#define S_ERROR     0x50
-#define S_DONE      0x60
-#define S_STATES    0x70
-
-#define F_TOKEN     0x80 /* got tag name */
 
 typedef void (*SML_StartElementHdlr) (void *ud, const char *name, const char **atts);
 typedef void (*SML_EndElementHdlr)   (void *ud, const char *name);
@@ -47,6 +21,27 @@ typedef void (*SML_CharDataHdlr)     (void *ud, const char *s, int len);
 typedef void (*SML_CommentHdlr)      (void *ud, const char *s, int len);
 typedef void (*SML_ExtensionHdlr)    (void *ud, const char *s, int len);
 typedef void (*SML_SchemeHdlr)       (void *ud, const char *name, const char **atts);
+
+/* mode */
+#define M_STRICT    0x00
+#define M_ESCAPE    0x01 /* \< \> \" \' */
+#define M_SLOPPY    0x02 /* <_ _> */
+#define M_QUOTES    0x04 /* flexible ".." '..' */
+#define M_ANYTAG    0x08 /* other/non-standard tag [] */
+#define M_MODES     0x0F
+
+/* state */
+#define S_TEXT      0x00
+#define S_CDATA     0x10 /* CDATA, COMMENT, and Extension*/
+#define S_MARKUP    0x20
+#define S_SCHEME    0x30
+#define S_STRING    0x40 /* in MARKUP */
+#define S_ERROR     0x50
+#define S_DONE      0x60
+#define S_STATES    0x70
+
+/* flag */
+#define F_TOKEN     0x80 /* got tag name */
 
 typedef struct Glnk Glnk;
 struct Glnk { Glnk *next; void *data; };
@@ -63,12 +58,12 @@ typedef struct SML_ParserStruct {
   SML_SchemeHdlr       fd; /* definition <! [] > */
   SML_ExtensionHdlr    fx; /* extension <? ?> */
 
-  BYTE mode; /* mode + state */
-  char quote;
+  BYTE mode; /* mode + state + flag */
+  char quote; /* ""''[] */
 
-  BYTE iExt; /* == Exts if no */
-  BYTE Exts; /* 255 */
   const char **szExts; /* pair <? ?> */
+  BYTE Exts;
+  BYTE iExt;
 
   char *elem;
   Glnk *attr;
@@ -78,9 +73,17 @@ typedef struct SML_ParserStruct {
 #define SML_GetCurrentColumnNumber(p)   ((p)->c)
 #define SML_GetCurrentByteIndex(p)      ((p)->i)
 
+enum MPState { /* parser status */
+  MPSpre,      /* initialized */
+  MPSok,       /* state while parsing */
+  MPSstring,   /* state while reading a string */
+  MPSfinished, /* state after finished parsing */
+  MPSerror
+};
+
 SML_Parser    SML_ParserCreate (void *opt);
 void          SML_SetEncoding  (SML_Parser p, const char *coding);
-enum MPState  SML_Parse        (SML_Parser p, const char *s, int len, int fEnd);
+enum MPState  SML_Parse        (SML_Parser p, const char *s, int len);
 const char   *SML_ErrorString  (SML_Parser p);
 void          SML_ParserFree   (SML_Parser p);
 

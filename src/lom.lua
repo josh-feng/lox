@@ -20,8 +20,8 @@ local mmin = math.min
 -- ================================================================== --
 local lom = { -- doctree for files, user's management {{{
     doc = {};
-    mp = require('lxp') -- the standard Lua Expat module
--- require('lsmp') -- TODO the standard Lua Expat module
+    -- mp = require('lxp') -- the standard Lua Expat module
+    mp = require('lsmp') -- TODO the standard Lua Expat module
 }
 
 local docs = lom.doc -- xml object list (hidden upvalue)
