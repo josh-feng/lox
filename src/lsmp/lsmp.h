@@ -1,11 +1,9 @@
-/* simple/sloppy markup(html/xml/xhtml) parser is a SAX XML parser */
+/* simple/sloppy markup(html/xml/xhtml) parser */
 #ifndef __lsmp_h
 #define __lsmp_h
 
 #include <stdio.h>
 
-typedef __uint32_t DWORD;
-typedef __uint16_t WORD;
 typedef __uint8_t  BYTE;
 
 #define StartElementKey   "StartElement"
@@ -34,36 +32,35 @@ typedef void (*SML_SchemeHdlr)       (void *ud, const char *name, const char **a
 #define S_TEXT      0x00
 #define S_CDATA     0x10 /* CDATA, COMMENT, and Extension*/
 #define S_MARKUP    0x20
-#define S_SCHEME    0x30
-#define S_STRING    0x40 /* in MARKUP */
-#define S_ERROR     0x50
-#define S_DONE      0x60
+#define S_STRING    0x30 /* in MARKUP */
+#define S_ERROR     0x40
+#define S_DONE      0x50
 #define S_STATES    0x70
 
 /* flag */
-#define F_TOKEN     0x80 /* got tag name */
+#define F_TOKEN     0x80 /* tag name found */
 
 typedef struct Glnk Glnk;
 struct Glnk { Glnk *next; void *data; };
 
 typedef struct SML_ParserStruct {
-  void *ud; /* userdata */
+  void *ud;                /* userdata */
   char *buf;
   unsigned int len, size;
-  unsigned int r, c, i; /* row, column, byte index */
+  unsigned int r, c, i;    /* row, column, byte index */
   SML_CharDataHdlr     ft; /* text <!CDATA[ ]]> */
   SML_StartElementHdlr fs; /* markup tag start */
   SML_EndElementHdlr   fe; /* markup tag end */
   SML_CommentHdlr      fc; /* comment <!-- --> */
-  SML_SchemeHdlr       fd; /* definition <! [] > */
+  SML_SchemeHdlr       fd; /* definition <!* [] > */
   SML_ExtensionHdlr    fx; /* extension <? ?> */
 
-  BYTE mode; /* mode + state + flag */
+  BYTE mode;  /* mode + state + flag */
   char quote; /* ""''[] */
 
-  const char **szExts; /* pair <? ?> */
-  BYTE Exts;
-  BYTE iExt;
+  const char **szExts; /* pair <? ?> ... */
+  BYTE Exts;           /* # of pairs */
+  BYTE iExt;           /* found */
 
   char *elem;
   Glnk *attr;
@@ -81,7 +78,7 @@ enum MPState { /* parser status */
   MPSerror
 };
 
-SML_Parser    SML_ParserCreate (void *opt);
+SML_Parser    SML_ParserCreate (void *ud);
 void          SML_SetEncoding  (SML_Parser p, const char *coding);
 enum MPState  SML_Parse        (SML_Parser p, const char *s, int len);
 const char   *SML_ErrorString  (SML_Parser p);

@@ -1,5 +1,5 @@
 #######################################################################
-# Lua Simple/Sloppy Markup Parser (to replace lxp)
+# Lua Simple/Sloppy Markup Parser
 PROJECT = lsmp
 LIBNAME = $(PROJECT).so
 
@@ -22,8 +22,10 @@ CC      ?= cc
 RM      ?= rm -rf
 INSTALL ?= install
 
-CF = -pedantic -Wall -O2 -fPIC -DPIC -I/usr/include
-CF += $(CFLAGS) $(DEBUG)
+CFLAGS += -pedantic -Wall -O2 -fPIC -DPIC -I/usr/include
+
+CF = $(CFLAGS) $(DEBUG) -DCFLAGS='"$(CFLAGS)"'
+CF += -DRELEASE='"$(shell echo $(PROJECT) | tr a-z A-Z)"'
 
 LF = -shared
 LF += $(LFLAGS)

@@ -30,7 +30,7 @@ static Glnk *stGlnkPop () {
 }
 
 static void stGlnkPush (Glnk *p) {
-  free(p->data);
+  // free(p->data);
   p->data = NULL;
   p->next = stGlnk; stGlnk = p;
 }
@@ -78,6 +78,26 @@ const char *SML_ErrorString (SML_Parser p) {
   return NULL;
 }
 
+static const char **SML_attr (SML_Parser p) { /* 2n + 1(NULL) */
+  int c = 0;
+  const char **szAttr;
+  Glnk *attr = p->attr;
+  while (attr) { c++; attr = attr->next; }
+  szAttr = (const char **) malloc(sizeof(char *) * (c + c + 1));
+  c = 0;
+  attr = p->attr;
+  while (attr) { /* TODO reverse order */
+    szAttr[c++] = (const char *) attr->data;
+    szAttr[c++] = (const char *) attr->data;
+    Glnk *tmp = attr;
+    attr = attr->next;
+    stGlnkPush(tmp);
+  }
+  p->attr = NULL;
+  szAttr[c] = (const char *) NULL;
+  return szAttr;
+}
+
 #define incr(x,p);  switch (*x++) { case '\n': p->r++; p->c = 0; default: p->c++; p->i++; }
 
 /* heurestic smp (sloppy markup parser) */
@@ -121,19 +141,12 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
           incr(c, p);
         }
         if (c != e) {
-          if (c != s) {
-            /* p->ft(p->ud, s, c - s); */
-            // printf("(%s)", strndup(s, c - s));
-          }
-          // printf("(%x, %x, %x)\n", s, c, e);
+          if (c != s) p->ft(p->ud, s, c - s);
           s = (const char *) c;
           p->mode = (p->mode & M_MODES) | S_MARKUP;
         }
         else if (fEnd) {
-          if (c != s) {
-            /* p->ft(p->ud, s, c - s); */
-            // printf("(%s)", s);
-          }
+          if (c != s) p->ft(p->ud, s, c - s);
           p->mode = (p->mode & M_MODES) | S_DONE;
         }
         break;
@@ -147,7 +160,6 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
         //          '[CDATA[' ==> S_CDATA
         //              ']]>' ==> S_TEXT
         //          '--' ==> S_CDATA
-        //              '-->' ==> S_TEXT
         //      tokens: ==> S_MARKUP
         //          '"' ==> S_STRING ==> '"' ==> S_MARKUP
         //          '>' ==> S_TEXT
@@ -155,6 +167,7 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
         // <?php ?> Extensions
         if (p->mode & F_TOKEN) { /* token found */
           while (c != e) {
+            // printf("%c", *c);
             if (*c == q || (!q && (*c == '"' || *c == '\''))) {
               // p->mode = (p->mode & M_MODES) | S_STRING;
               // break;
@@ -163,19 +176,22 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
               if (s != c) {
                 Glnk *attr = stGlnkPop();
                 attr->next = p->attr; p->attr = attr;
-                attr->data = (void *) strndup(s, c - s);
+                // attr->data = (void *) strndup(s, c - s);
+                attr->data = (void *) s; *c = '\0';
               }
               s = (const char *) (c + 1);
             }
             else if (*c == '>') {
-              if (p->elem[0] == '!') { /* <!.. ...> */
-                /* p->fd(p->ud, s, c - s); */
+              if (s != c) { /* TODO last attr */
               }
-              else if (p->elem[0] == '/') { /* clean attribute */
-                /* p->fe(p->ud, s); */
+              if (p->elem[0] == '/') { /* clean attribute */
+                p->fe(p->ud, p->elem); /* TODO clean */
               }
-              else { /* <*.. ...> */
-                /* p->fs(p->ud, s, c - s); */
+              else if (p->elem[0] == '!') { /* TODO <!.. ...> */
+                p->fd(p->ud, p->elem, SML_attr(p));
+              }
+              else { /* TODO <*.. ...> */
+                p->fs(p->ud, p->elem, SML_attr(p));
               }
               free(p->elem);
               p->elem = NULL; // TODO free szExts
@@ -194,14 +210,14 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
               p->mode = (p->mode & M_MODES) | S_CDATA;
               incr(c, p);
               s = (const char *) c;
-              printf("COMMENT\n");
+              // printf("COMMENT\n");
               break;
             }
             else if ((bc = *c) && (bc <= ' ' || (bc > '~' && bc <= 0x7F))) { /* space */
-              int i, n = c - s;
+              int i, n = c - s++;
               for (i = 0; i < p->Exts; i++) if (strncmp(s, p->szExts[2 * i], n) == 0) break;
               p->iExt = i;
-              p->elem = strndup(++s, c - s);
+              p->elem = strndup(s, c - s);
               if (i < p->Exts) {
                 p->mode = (p->mode & M_MODES) | S_CDATA;
               }
@@ -218,13 +234,13 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
             else if (bc == '>') {
               if (c == ++s) { /* TODO <> */
                 p->mode = (p->mode & M_MODES) | S_TEXT;
+                incr(c, p);
               }
               else { /* TODO <*> */
                 p->mode |= F_TOKEN;
                 p->elem = strndup(s, c - s);
                 printf("TOKEN %s\n", p->elem);
               }
-              incr(c, p);
               s = (const char *) c;
               break;
             }
@@ -252,11 +268,11 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
               // }
             }
             else if (0 == strncmp(c - 2, "]]>", 3)) {
-              // p->ft(p->ud, s, c - s); /* cdata text */
+              p->ft(p->ud, s, c - 2 - s); /* cdata text */
               break;
             }
             else if ((0 == strncmp(c - 2, "-->", 3)) && c > s + 7 ) {
-              // p->fc(p->ud, s, c - s); /* comment */
+              p->fc(p->ud, s, c - 2 - s); /* comment */
               break;
             }
           }
@@ -351,7 +367,7 @@ static int getHandle (lsmp_ud *mpu, const char *handle) {
   if (mpu->state == MPSerror) return 0;
   lua_getuservalue(L, 1);
   lua_pushstring(L, handle);
-  lua_gettable(L, 3);
+  lua_gettable(L, 2);
   if (!lua_isfunction(L, -1)) {
     luaL_error(L, "lsmp '%s' callback is not a function", handle);
   }
@@ -363,7 +379,6 @@ static int getHandle (lsmp_ud *mpu, const char *handle) {
 
 void f_CharData (void *ud, const char *s, int len) {
   lsmp_ud *mpu = (lsmp_ud *) ud;
-  printf("OK here\n");
   if (getHandle(mpu, CharacterDataKey) && mpu->state == MPSok) {
     lua_pushlstring(mpu->L, s, len);
     docall(mpu, 1 + 1, 0);
@@ -387,7 +402,25 @@ void f_Extension (void *ud, const char *s, int len) {
 }
 
 void f_Scheme (void *ud, const char *name, const char **attrs) {
-  stGlnkPush(NULL);
+  lsmp_ud *mpu = (lsmp_ud *) ud;
+  if (getHandle(mpu, SchemeKey)) {
+    lua_State *L = mpu->L;
+    lua_pushstring(L, name);
+    lua_newtable(L);
+    int i = 1;
+    while (*attrs) {
+      lua_pushinteger(L, i++);
+      lua_pushstring(L, *attrs);
+      lua_settable(L, -3);
+      if (*(attrs + 1)) {
+        lua_pushstring(L, *attrs++);
+        lua_pushstring(L, *attrs++);
+        lua_settable(L, -3);
+      }
+    }
+    /* call function with self, name, and attributes */
+    docall(mpu, 1 + 2, 0);
+  }
 }
 
 void f_StartElement (void *ud, const char *name, const char **attrs) {
@@ -429,6 +462,7 @@ static int getcallbacks (lua_State *L) {
 
 static int parse_aux (lua_State *L, lsmp_ud *mpu, const char *s, size_t len) {
   mpu->L = L;
+  lua_settop(L, 1);
   mpu->state = SML_Parse(mpu->parser, s, (int) len); /* state */
   if (mpu->state == MPSerror) {
     lua_rawgeti(L, LUA_REGISTRYINDEX, mpu->errorref);  /* get original msg. */
@@ -498,7 +532,7 @@ static int lsmp_creator (lua_State *L) {
   lua_setuservalue(L, -2);
 
   mpu->L = L;
-  mpu->state = MPSpre;
+  mpu->state = MPSok;
   mpu->errorref = LUA_REFNIL;
   SML_Parser p = mpu->parser = SML_ParserCreate(mpu);
   if (!p) luaL_error(L, "SML_ParserCreate failed");
@@ -516,11 +550,13 @@ static int lsmp_creator (lua_State *L) {
   p->fc = f_Comment;
   p->fd = f_Scheme;
   p->fx = f_Extension;
+  p->elem = NULL;
+  p->attr = NULL;
   return 1;
 }
 
 static int lsmp_wraper (lua_State *L) {
-  lua_remove(L, 1); /* pop the module table */
+  lua_remove(L, 1); /* pop the lsmp module table */
   return lsmp_creator(L);
 }
 
@@ -558,10 +594,10 @@ LUA_API int luaopen_lsmp (lua_State *L) {
 
   luaL_newlib(L, lsmp_funcs); /* the module table */
   luaL_newlib(L, lsmp_mt);    /* the module metatable */
-  lua_pushstring(L, "Lua " LUA_VDIR); /* + compiling info */
+  lua_pushstring(L, "Lua " LUA_VDIR ": " CFLAGS);
   lua_setfield(L, -2, "__metatable");
   lua_setmetatable(L, -2);
-  lua_pushstring(L, "MIT License (c) " __DATE__); /* + version */
+  lua_pushstring(L, RELEASE " MIT License (c) " __DATE__);
   lua_setfield(L, -2, "lic");
   return 1;
 }

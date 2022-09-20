@@ -1,6 +1,6 @@
 # lox (lua object model for x/html)
 
-XML is wacky and verbose. To parse an xml file to a lua table
+X/HTML is wacky and verbose. To parse an xml file to a lua table
 and be able to recover it back to the orignal xml, it needs some design.
 Our design is pretty much the same as the document object model
 in luaExpat's `lxp.lom`; however, we use OOP to add structures
@@ -282,3 +282,12 @@ lom(true) -- build the links
 
 x = XmlObject(doc)
 ```
+
+# LSMP
+
+Lua Sloppy Markup Parser
+
+
+XML expat coding reference:
+
+- <https://strophe.im/libstrophe/doc/0.10.0/expat_8h.html>
