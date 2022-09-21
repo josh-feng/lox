@@ -2,7 +2,9 @@
 -- ================================================================== --
 -- useful stuff (us:utility subroutine) on top of 'posix' module
 -- ================================================================== --
-local we = {stamp = false} -- working environment
+local we = {} -- working environment
+
+we.stamp, we.posix = pcall(require, 'posix')
 
 local strgsub, strsub, strgmatch, strmatch, strfind =
     string.gsub, string.sub, string.gmatch, string.match, string.find
@@ -38,8 +40,10 @@ we.dbg = function (msg) if we.debug then we.info(msg, 'DBG:') end end
 -- ================================================================== --
 -- ================  EXTERNAL SUBPROCESS COMMAND   ================== --
 -- ================================================================== --
-local posix = require('posix')
+
 we.popen = function (datastr, cmd) -- {{{ status, out, err = we.popen(in, cmd)
+    if not (posix or we.posix) then return 'Not supported' end
+    local posix = posix or we.posix
     --  thread
     --  +--------+
     --  | i-rw-> | pipe (is uni-directional)
