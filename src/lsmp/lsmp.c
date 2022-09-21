@@ -36,8 +36,8 @@ static void stGlnkPush (Glnk *p) {
 
 static void stGlnkFree () {
   while (stackGlnk) {
-    Glnk *p = GlnkTop;
-    GlnkTop = GlnkTop->next;
+    Glnk *p = stackGlnk;
+    stackGlnk = stackGlnk->next;
     free(p);
   }
 }
