@@ -47,7 +47,7 @@ typedef struct SML_ParserStruct {
   void *ud;                /* userdata */
   char *buf;
   unsigned int len, size;
-  unsigned int r, c, i;    /* row, column, byte index */
+  unsigned int r, c, i, n; /* row, column, byte index, pre-col */
   SML_CharDataHdlr     ft; /* text <!CDATA[ ]]> */
   SML_StartElementHdlr fs; /* markup tag start */
   SML_EndElementHdlr   fe; /* markup tag end */
@@ -59,11 +59,13 @@ typedef struct SML_ParserStruct {
   char quote; /* ""''[] */
 
   const char **szExts; /* pair <? ?> ... */
+  char *lszExts;       /* length of closing token */
   BYTE Exts;           /* # of pairs */
   BYTE iExt;           /* found */
 
   char *elem;
   Glnk *attr;
+  int  level;
 } *SML_Parser;
 
 #define SML_GetCurrentLineNumber(p)     ((p)->r)
@@ -71,17 +73,16 @@ typedef struct SML_ParserStruct {
 #define SML_GetCurrentByteIndex(p)      ((p)->i)
 
 enum MPState { /* parser status */
-  MPSpre,      /* initialized */
   MPSok,       /* state while parsing */
   MPSstring,   /* state while reading a string */
   MPSfinished, /* state after finished parsing */
   MPSerror
 };
 
-SML_Parser    SML_ParserCreate (void *ud);
-void          SML_SetEncoding  (SML_Parser p, const char *coding);
+SML_Parser    SML_ParserCreate (void *ud, int mode, const char *ext);
 enum MPState  SML_Parse        (SML_Parser p, const char *s, int len);
 const char   *SML_ErrorString  (SML_Parser p);
 void          SML_ParserFree   (SML_Parser p);
 
 #endif
+/*vim:ts=4:sw=4:sts=4:et:fen:fdm=marker:fmr={{{,}}}:fdl=1:cms=*/
