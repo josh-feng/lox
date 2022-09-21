@@ -201,7 +201,7 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
               incr(c, p);
               break;
             }
-            else if (*c == ' ' || *c == '<') { /* < or space */
+            else if (*c <= ' ' || *c == '<') { /* < or space */
               if (*c == '<') p->level++; /* level */
               if (s != c) { /* collect attributes */
                 Glnk *attr = stGlnkPop();
@@ -209,29 +209,46 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
                 // attr->data = (void *) strndup(s, c - s);
                 attr->data = (void *) s; *c = '\0';
               }
-              s = (const char *) c;
+              s = (const char *) c + 1;
             }
             else if (*c == '>') {
-              p->level--; /* level */
-              if (p->level == 0) p->mode &= ~(F_TOKEN);
+              BYTE closing = 0;
+              if (p->level > 0) {
+                p->level--; /* TODO level */
+                *c = ' ';
+              }
+              else { /* closing */
+                if (s != c && s != p->elem) { /* last attr */
+                  *c = '\0';
+                  if (*(c - 1) == '/') {
+                    *(c - 1) = '\0';
+                    closing = 0x01; /* also closing */
+                  }
+                  if (*s != '\0') {
+                    Glnk *attr = stGlnkPop();
+                    attr->next = p->attr; p->attr = attr;
+                    // attr->data = (void *) strndup(s, c - s);
+                    attr->data = (void *) s;
+                  }
+                }
 
-              if (s != c) { /* TODO last attr */
+                if (p->elem[0] == '/') { /* clean attribute */
+                  p->fe(p->ud, p->elem); /* TODO clean */
+                }
+                else if (p->elem[0] == '!') { /* TODO <!.. ...> */
+                  p->fd(p->ud, p->elem, SML_attr(p));
+                }
+                else { /* TODO <*.. ...> */
+                  p->fs(p->ud, p->elem, SML_attr(p));
+                  if (closing) p->fe(p->ud, p->elem);
+                }
+                free(p->elem);
+                p->elem = NULL;
+                p->mode = (p->mode & M_MODES) | S_TEXT;
+                incr(c, p);
+                s = (const char *) c;
+                break;
               }
-              if (p->elem[0] == '/') { /* clean attribute */
-                p->fe(p->ud, p->elem); /* TODO clean */
-              }
-              else if (p->elem[0] == '!') { /* TODO <!.. ...> */
-                p->fd(p->ud, p->elem, SML_attr(p));
-              }
-              else { /* TODO <*.. ...> */
-                p->fs(p->ud, p->elem, SML_attr(p));
-              }
-              free(p->elem);
-              p->elem = NULL;
-              p->mode = (p->mode & M_MODES) | S_TEXT;
-              incr(c, p);
-              s = (const char *) c;
-              break;
             }
             incr(c, p);
           }
@@ -260,7 +277,7 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
               }
               incr(c, p);
               s = (const char *) c;
-              printf("TOKEN1 %s\n", p->elem);
+              printf("TOKEN1 (%s)%x\n", p->elem, p->mode);
               break;
             }
             else if (bc == '>') {
@@ -271,7 +288,7 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
               else { /* <*> */
                 p->mode |= F_TOKEN;
                 p->elem = strndup(s, c - s);
-                printf("TOKEN2 %s\n", p->elem);
+                printf("TOKEN2 (%s)%x\n", p->elem, p->mode);
               }
               s = (const char *) c;
               break;
@@ -288,7 +305,7 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
           incr(c, p);
         }
         if (c != e) {
-          p->mode = (p->mode & M_MODES) | S_MARKUP;
+          p->mode = (p->mode & M_MODES) | S_MARKUP | F_TOKEN;
           p->quote = q = '\0';
           incr(c, p);
         }
