@@ -4,7 +4,8 @@ X/HTML is wacky and verbose. To parse an xml file to a lua table
 and be able to recover it back to the orignal xml, it needs some design.
 Our design is pretty much the same as the document object model
 in luaExpat's `lxp.lom`; however, we use OOP to add structures
-and functionalities on our dom.
+and functionalities on our dom, and we implement a simple markup language parser
+for the expat replacement.
 
 ```html
 <tag>
@@ -46,9 +47,9 @@ We will see if running lua inside a browser (console) is possible.
 
 
 - lua >= 5.1
-- luaExpat: <http://www.keplerproject.org/luaexpat> or <https://github.com/LuaDist/luaexpat>
-- posix <https://github.com/luaposix/luaposix/> (required by `us.lua`)
 - pool: <https://github.com/josh-feng/pool.git>
+- ~~luaExpat: <http://www.keplerproject.org/luaexpat> or <https://github.com/LuaDist/luaexpat>~~
+- ~~posix <https://github.com/luaposix/luaposix/> (required by `us.lua`)~~
 
 
 ## lom
@@ -285,8 +286,7 @@ x = XmlObject(doc)
 
 # LSMP
 
-Lua Sloppy Markup Parser
-
+Lua Simple/Sloppy Markup Parser
 
 XML expat coding reference:
 
