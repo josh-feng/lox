@@ -20,17 +20,23 @@ local mmin = math.min
 -- ================================================================== --
 local lom = { -- doctree for files, user's management {{{
     doc = {};
-    -- mp = require('lxp') -- the standard Lua Expat module
-    mp = require('lsmp') -- TODO the standard Lua Expat module
+    mp = require('lsmp') -- a Lua SAX to replace lxp
 }
 
 local docs = lom.doc -- xml object list (hidden upvalue)
 
+local function scheme (p, name, attr) -- {{{
+    local stack = p:getcallbacks().stack
+    -- print("scheme ("..name..") "..tconcat(attr, '_'))
+    -- tinsert(stack, {['.'] = name, ['@'] = #attr > 0 and attr or nil})
+end -- }}}
 local function starttag (p, name, attr) -- {{{
+    -- print("start ("..name..") "..tconcat(attr, '_'))
     local stack = p:getcallbacks().stack
     tinsert(stack, {['.'] = name, ['@'] = #attr > 0 and attr or nil})
 end -- }}}
 local function endtag (p, name) -- {{{
+    -- print("end ("..name..")")
     local stack = p:getcallbacks().stack
     local element = tremove(stack)
     -- assert(element['.'] == name)
@@ -44,10 +50,12 @@ local function cleantext (p, txt) -- {{{
     end
 end -- }}}
 local function text (p, txt) -- {{{
+    -- print("text ("..txt..") ")
     local stack = p:getcallbacks().stack
     tinsert(stack[#stack], txt)
 end -- }}}
 local function comment (p, txt) -- {{{
+    -- print("comment ("..txt..") ")
     local stack = p:getcallbacks().stack
     tinsert(stack[#stack], '\0'..txt)
 end -- }}}
@@ -238,8 +246,10 @@ local dom = class { -- lua document object model {{{
                 StartElement = starttag,
                 EndElement = endtag,
                 CharacterData = mode < 0 and text or cleantext,
-                Comment = mode < 1 and comment or nil,
-                _nonstrict = true,
+                Comment = comment,
+                Scheme = scheme,
+                mode = 15,
+                extension = "<?php ?>",
                 stack = {o} -- {{}}
             }
 
@@ -442,6 +452,10 @@ if arg and #arg > 0 and strfind(arg[0] or '', 'lom.lua$') then
     -- lom(true)
     print(doc['?'] and tconcat(doc['?'], '\n') or doc:drop())
 end -- }}}
+
+-- local a = lom('/usr/share/xml/svg/catalog.xml')
+local a = lom('/home/jfeng/Downloads/catalog.xml')
+print(a:drop())
 
 return lom
 -- vim:ts=4:sw=4:sts=4:et:fen:fdm=marker:fmr={{{,}}}:fdl=1
