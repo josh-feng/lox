@@ -291,3 +291,22 @@ Lua Simple/Sloppy Markup Parser
 XML expat coding reference:
 
 - <https://strophe.im/libstrophe/doc/0.10.0/expat_8h.html>
+
+
+# Note
+
+TODO
+
+- level/extension
+- call backs
+- attr handling
+- error handling
+- makefile
+- lom
+  - attr handling
+- xml, html examples
+- us.lua
+- XmlObject
+- README
+- luarocks
+

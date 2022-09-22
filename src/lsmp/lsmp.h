@@ -1,26 +1,27 @@
 /* simple/sloppy markup(html/xml/xhtml) parser
-** Josh Feng (C) MIT 2022
+** Josh Feng (C) MIT license 2022
 */
 #ifndef __lsmp_h
 #define __lsmp_h
 
 #include <stdio.h>
 
+typedef __uint16_t WORD;
 typedef __uint8_t  BYTE;
 
+#define SchemeKey         "Scheme"
 #define StartElementKey   "StartElement"
 #define EndElementKey     "EndElement"
 #define CharacterDataKey  "CharacterData"
 #define CommentKey        "Comment"
 #define ExtensionKey      "Extension"
-#define SchemeKey         "Scheme"
 
+typedef void (*SML_SchemeHdlr)       (void *ud, const char *name, const char **atts);
 typedef void (*SML_StartElementHdlr) (void *ud, const char *name, const char **atts);
 typedef void (*SML_EndElementHdlr)   (void *ud, const char *name);
 typedef void (*SML_CharDataHdlr)     (void *ud, const char *s, int len);
 typedef void (*SML_CommentHdlr)      (void *ud, const char *s, int len);
 typedef void (*SML_ExtensionHdlr)    (void *ud, const char *s, int len);
-typedef void (*SML_SchemeHdlr)       (void *ud, const char *name, const char **atts);
 
 /* mode */
 #define M_STRICT    0x00
@@ -43,7 +44,7 @@ typedef void (*SML_SchemeHdlr)       (void *ud, const char *name, const char **a
 #define F_TOKEN     0x80 /* tag name found */
 
 typedef struct Glnk Glnk;
-struct Glnk { Glnk *next; void *data; };
+struct Glnk { Glnk *next; void *data; WORD level; };
 
 typedef struct SML_ParserStruct {
   void *ud;                /* userdata */
