@@ -59,6 +59,11 @@ local function comment (p, txt) -- {{{
     local stack = p:getcallbacks().stack
     tinsert(stack[#stack], '\0'..txt)
 end -- }}}
+local function extension (p, txt) -- {{{
+    -- print("comment ("..txt..") ")
+    local stack = p:getcallbacks().stack
+    tinsert(stack[#stack], '\0'..txt)
+end -- }}}
 
 local function parse (o, txt) -- friend function {{{
     local p = o[0]
@@ -243,13 +248,14 @@ local dom = class { -- lua document object model {{{
         elseif type(spec) == 'string' then -- '' for text
             mode = tonumber(mode) or 0
             local p = lom.mp.new {
+                Scheme = scheme,
                 StartElement = starttag,
                 EndElement = endtag,
                 CharacterData = mode < 0 and text or cleantext,
                 Comment = comment,
-                Scheme = scheme,
+                Extension = extension,
                 mode = 15,
-                extension = "<?php ?>",
+                ext = "<?php ?>",
                 stack = {o} -- {{}}
             }
 
@@ -452,10 +458,6 @@ if arg and #arg > 0 and strfind(arg[0] or '', 'lom.lua$') then
     -- lom(true)
     print(doc['?'] and tconcat(doc['?'], '\n') or doc:drop())
 end -- }}}
-
--- local a = lom('/usr/share/xml/svg/catalog.xml')
-local a = lom('/home/jfeng/Downloads/catalog.xml')
-print(a:drop())
 
 return lom
 -- vim:ts=4:sw=4:sts=4:et:fen:fdm=marker:fmr={{{,}}}:fdl=1
