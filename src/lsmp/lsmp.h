@@ -1,4 +1,6 @@
-/* simple/sloppy markup(html/xml/xhtml) parser */
+/* simple/sloppy markup(html/xml/xhtml) parser
+** Josh Feng (C) MIT 2022
+*/
 #ifndef __lsmp_h
 #define __lsmp_h
 
@@ -56,21 +58,21 @@ typedef struct SML_ParserStruct {
   SML_ExtensionHdlr    fx; /* extension <? ?> */
 
   BYTE mode;  /* mode + state + flag */
-  char quote; /* ""''[] */
+  char quote; /* "' */
 
   const char **szExts; /* pair <? ?> ... */
   char *lszExts;       /* length of closing token */
   BYTE Exts;           /* # of pairs */
-  BYTE iExt;           /* found */
+  BYTE iExt;           /* found index */
 
   char *elem;
   Glnk *attr;
   int  level;
 } *SML_Parser;
 
-#define SML_GetCurrentLineNumber(p)     ((p)->r)
-#define SML_GetCurrentColumnNumber(p)   ((p)->c)
-#define SML_GetCurrentByteIndex(p)      ((p)->i)
+#define SML_GetCurrentLineNumber(p)     ((p)->r + 1)
+#define SML_GetCurrentColumnNumber(p)   ((p)->c + 1)
+#define SML_GetCurrentByteIndex(p)      ((p)->i + 1)
 
 enum MPState { /* parser status */
   MPSok,       /* state while parsing */

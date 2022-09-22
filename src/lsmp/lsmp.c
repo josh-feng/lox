@@ -1,6 +1,7 @@
 /* lua simple/sloppy markup(x/html) parser
-The first part is solely a SML parser in C.
-The second part is for lua module, as a coding example of the first part
+** Josh Feng (C) MIT 2022
+** The first part is solely a SML parser in C.
+** The second part is for lua module, as a coding example of the first part
 */
 #include <stdio.h>
 #include <assert.h>
@@ -8,6 +9,12 @@ The second part is for lua module, as a coding example of the first part
 #include <string.h>
 
 #include "lsmp.h"
+
+#ifdef DEBUG
+#define DBG(l,x);  if (DEBUG >= l) {x}
+#else
+#define DBG(l,x);
+#endif
 
 /* general link {{{ */
 static Glnk *stackGlnk = NULL;
@@ -232,13 +239,17 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
                   }
                 }
 
-                if (p->elem[0] == '/') { /* clean attribute */
+                bc = p->elem[0];
+                if (bc == '/') { /* clean attribute */
                   p->fe(p->ud, p->elem); /* TODO clean */
                 }
-                else if (p->elem[0] == '!') { /* TODO <!.. ...> */
+                else if ((bc != '_') &&
+                        !((bc >= 'a') && (bc <= 'z')) &&
+                        !((bc >= 'A') && (bc <= 'Z'))) {
+                  /* TODO <!.. ...> */
                   p->fd(p->ud, p->elem, SML_attr(p));
                 }
-                else { /* TODO <*.. ...> */
+                else { /* regular tag TODO <*.. ...> */
                   p->fs(p->ud, p->elem, SML_attr(p));
                   if (closing) p->fe(p->ud, p->elem);
                 }
@@ -277,7 +288,7 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
               }
               incr(c, p);
               s = (const char *) c;
-              printf("TOKEN1 (%s)%x\n", p->elem, p->mode);
+              DBG(1, printf("TOKEN1 (%s)%x\n", p->elem, p->mode););
               break;
             }
             else if (bc == '>') {
@@ -288,7 +299,7 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
               else { /* <*> */
                 p->mode |= F_TOKEN;
                 p->elem = strndup(s, c - s);
-                printf("TOKEN2 (%s)%x\n", p->elem, p->mode);
+                DBG(1, printf("TOKEN2 (%s)%x\n", p->elem, p->mode););
               }
               s = (const char *) c;
               break;

@@ -15,7 +15,7 @@ DESTDIR = /usr/local/share/lua/$(LUA_V)
 #######################################################################
 #########  DO NOT MODIFY THE FOLLOWING UNLESS NECESSARY  ##############
 #######################################################################
-# DEBUG = -g -DDEBUG
+# DEBUG = -g -DDEBUG=2
 OBJS = $(PROJECT)/lsmp.o
 
 CC      ?= cc
