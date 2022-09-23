@@ -21,7 +21,7 @@ typedef void (*SML_StartElementHdlr) (void *ud, const char *name, const char **a
 typedef void (*SML_EndElementHdlr)   (void *ud, const char *name);
 typedef void (*SML_CharDataHdlr)     (void *ud, const char *s, int len);
 typedef void (*SML_CommentHdlr)      (void *ud, const char *s, int len);
-typedef void (*SML_ExtensionHdlr)    (void *ud, const char *s, int len);
+typedef void (*SML_ExtensionHdlr)    (void *ud, const char *name, const char *s, int len);
 
 /* mode */
 #define M_STRICT    0x00

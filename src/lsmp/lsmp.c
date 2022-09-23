@@ -353,7 +353,7 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
               int l = p->lszExts[p->iExt];
               if (0 == strncmp(c - l + 1, p->szExts[p->iExt], l)) {
                 *(c - l + 1) = '\0';
-                p->fx(p->ud, s, c - l + 1 - s);
+                p->fx(p->ud, p->elem, s, c - l + 1 - s);
                 break;
               }
             }
@@ -432,6 +432,7 @@ static int getHandle (lsmp_ud *mpu, const char *handle) {
   lua_getuservalue(L, 1);
   lua_pushstring(L, handle);
   lua_gettable(L, 2);
+  if (lua_isnil(L, -1)) return 0;
   if (!lua_isfunction(L, -1)) {
     luaL_error(L, "lsmp '%s' callback is not a function", handle);
   }
@@ -457,11 +458,12 @@ void f_Comment (void *ud, const char *s, int len) {
   }
 }
 
-void f_Extension (void *ud, const char *s, int len) {
+void f_Extension (void *ud, const char *name, const char *s, int len) {
   lsmp_ud *mpu = (lsmp_ud *) ud;
   if (getHandle(mpu, ExtensionKey)) {
+    lua_pushstring(mpu->L, name);
     lua_pushlstring(mpu->L, s, len);
-    docall(mpu, 1 + 1, 0);
+    docall(mpu, 1 + 2, 0);
   }
 }
 
