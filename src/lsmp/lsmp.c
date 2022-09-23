@@ -16,6 +16,10 @@
 #define DBG(l,x);
 #endif
 
+const char *SML_ErrorString[] = {
+  "OK", /* OK */
+};
+
 /* general link {{{ */
 static Glnk *stackGlnk = NULL;
 static Glnk *GlnkTop = NULL;
@@ -66,6 +70,7 @@ new --> parser
 
 SML_Parser SML_ParserCreate (void *ud, int mode, const char *ext) {
   SML_Parser p = (SML_Parser) malloc(sizeof(struct SML_ParserStruct));
+  if (!p) return p;
   p->ud = ud;
   p->buf = NULL;
   p->len = p->size = p->r = p->c = p->i = p->n = 0;
@@ -113,11 +118,6 @@ void SML_ParserFree (SML_Parser p) {
   free(p);
 }
 
-const char *SML_ErrorString (SML_Parser p) {
-  /* TODO */
-  return NULL;
-}
-
 static const char **SML_attr (SML_Parser p) { /* n + 1(NULL) */
   int c = 0;
   const char **szAttr;
@@ -127,7 +127,6 @@ static const char **SML_attr (SML_Parser p) { /* n + 1(NULL) */
   szAttr[c--] = (const char *) NULL;
   attr = p->attr;
   while (attr) {
-    /* TODO if level info */
     szAttr[c--] = (const char *) attr->data; /* key (+ value) */
     Glnk *tmp = attr; attr = attr->next; stGlnkPush(tmp);
   }
@@ -136,6 +135,9 @@ static const char **SML_attr (SML_Parser p) { /* n + 1(NULL) */
 } /* }}} */
 
 #define incr(x,p);  switch (*x++) { case '\n': p->n = p->c; p->r++; p->c = 0; default: p->c++; p->i++; }
+
+const char *mus = "<"; /* markup start */
+const char *mue = ">"; /* markup end */
 
 /* heurestic smp (sloppy markup parser) {{{ */
 enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
@@ -165,7 +167,6 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
 
   BYTE escape = p->mode & M_ESCAPE;
   BYTE sloppy = p->mode & M_SLOPPY;
-  BYTE anytag = p->mode & M_ANYTAG;
   DBG(2, printf("%d (%x, %x, %x) %d\n", p->mode, s, c, e, len););
 
   while (c != e) {
@@ -184,9 +185,7 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
           p->mode = (p->mode & M_MODES) | S_MARKUP;
         }
         else if (fEnd) {
-          if (c != s) {
-            if (sloppy) p->ft(p->ud, s, c - s); else { /* error bad <* */ }
-          }
+          if (c != s) p->ft(p->ud, s, c - s);
           p->mode = (p->mode & M_MODES) | S_DONE;
         }
         break; /* text }}} */
@@ -213,44 +212,67 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
               break;
             }
             else if (*c <= ' ' || *c == '<') { /* < or space */
-              if (*c == '<') p->level++; /* increase level */
+              BYTE opening = 0;
+              Glnk *attr;
+              if (*c == '<') {
+                p->level++;
+                opening = 1;
+              }
               if (s != c) { /* collect attributes */
-                /* TODO attr data w/ level */
-                Glnk *attr = stGlnkPop();
-                attr->next = p->attr; p->attr = attr;
+                attr = stGlnkPop(); attr->next = p->attr; p->attr = attr;
                 attr->data = (void *) s; *c = '\0';
+              }
+              if (opening) {
+                attr = stGlnkPop(); attr->next = p->attr; p->attr = attr;
+                attr->data = (void *) mus;
               }
               s = (const char *) c + 1;
             }
             else if (*c == '>') {
               BYTE closing = 0;
+              Glnk *attr;
               if (p->level > 0) {
-                p->level--; /* decrease level */
-                *c = ' ';
+                p->level--;
+                if (s != c) { /* collect attributes */
+                  attr = stGlnkPop(); attr->next = p->attr; p->attr = attr;
+                  attr->data = (void *) s; *c = '\0';
+                }
+                attr = stGlnkPop(); attr->next = p->attr; p->attr = attr;
+                attr->data = (void *) mue;
+                s = (const char *) c + 1;
               }
               else { /* closing */
+                bc = p->elem[0];
+
                 if (s != c && s != p->elem) { /* last attr */
                   *c = '\0';
-                  if (*(c - 1) == '/') {
+                  if (bc == '?' && *(c - 1) == '?') {
+                    *(c - 1) = '\0';
+                  }
+                  else if (((bc == '_') ||
+                           ((bc >= 'a') && (bc <= 'z')) ||
+                           ((bc >= 'A') && (bc <= 'Z'))) &&
+                           *(c - 1) == '/') {
                     *(c - 1) = '\0';
                     closing = 0x01; /* also closing */
                   }
                   if (*s != '\0') {
-                    Glnk *attr = stGlnkPop();
-                    attr->next = p->attr; p->attr = attr;
+                    attr = stGlnkPop(); attr->next = p->attr; p->attr = attr;
                     attr->data = (void *) s;
                   }
                 }
 
-                bc = p->elem[0];
                 if (bc == '/') { /* clean attribute */
-                  /* TODO clean attr or error if strict */
+                  attr = p->attr;
+                  while (attr) { /* clean attr or error if strict */
+                    Glnk *tmp = attr; attr = attr->next; stGlnkPush(tmp);
+                  }
                   p->fe(p->ud, p->elem);
                 }
                 else if ((bc != '_') &&
                         !((bc >= 'a') && (bc <= 'z')) &&
                         !((bc >= 'A') && (bc <= 'Z'))) {
-                  /* TODO <!.. ...> <?.. ...> etc */
+                  /* scheme/definition/declaration <!.. ...> <?.. ...> etc */
                   p->fd(p->ud, p->elem, SML_attr(p));
                 }
                 else { /* regular tag <*.. ...> */
@@ -287,8 +309,6 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
               }
               else {
                 p->mode |= F_TOKEN;
-                if (!anytag) { /* TODO check legel tag */
-                }
               }
               incr(c, p);
               s = (const char *) c;
@@ -497,23 +517,21 @@ static int getcallbacks (lua_State *L) {
 static int parse_aux (lua_State *L, lsmp_ud *mpu, const char *s, size_t len) {
   mpu->L = L;
   lua_settop(L, 1);
-  mpu->state = SML_Parse(mpu->parser, s, (int) len); /* state */
+  mpu->state = SML_Parse(mpu->parser, s, (int) len);
   if (mpu->state == MPSerror) {
     lua_rawgeti(L, LUA_REGISTRYINDEX, mpu->errorref);  /* get original msg. */
     lua_error(L);
+
+    SML_Parser p = mpu->parser;
+    lua_pushnil(L);
+    lua_pushstring(L, SML_ErrorString[0]);
+    lua_pushinteger(L, SML_GetCurrentLineNumber(p) + 1);
+    lua_pushinteger(L, SML_GetCurrentColumnNumber(p) + 1);
+    lua_pushinteger(L, SML_GetCurrentByteIndex(p) + 1);
+    return 5;
   }
-  if (mpu->state != MPSerror) {
-    lua_settop(L, 1);  /* return parser userdata on success */
-    return 1;
-  }
-  /* error */
-  SML_Parser p = mpu->parser;
-  lua_pushnil(L);
-  lua_pushstring(L, SML_ErrorString(p));
-  lua_pushinteger(L, SML_GetCurrentLineNumber(p) + 1);
-  lua_pushinteger(L, SML_GetCurrentColumnNumber(p) + 1);
-  lua_pushinteger(L, SML_GetCurrentByteIndex(p) + 1);
-  return 5;
+  lua_settop(L, 1);  /* return parser userdata on success */
+  return 1;
 }
 
 static int lsmp_pos (lua_State *L) {

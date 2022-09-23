@@ -27,9 +27,11 @@ typedef void (*SML_ExtensionHdlr)    (void *ud, const char *s, int len);
 #define M_STRICT    0x00
 #define M_ESCAPE    0x01 /* \< \> \" \' */
 #define M_SLOPPY    0x02 /* <_ _> */
-#define M_QUOTES    0x04 /* flexible ".." '..' */
-#define M_ANYTAG    0x08 /* other/non-standard tag [] */
-#define M_MODES     0x0F
+#define M_MISC      0x04 /* TODO */
+#define M_MODES     0x07
+
+/* flag */
+#define F_TOKEN     0x08 /* tag name found */
 
 /* state */
 #define S_TEXT      0x00
@@ -38,13 +40,10 @@ typedef void (*SML_ExtensionHdlr)    (void *ud, const char *s, int len);
 #define S_STRING    0x30 /* in MARKUP */
 #define S_ERROR     0x40
 #define S_DONE      0x50
-#define S_STATES    0x70
-
-/* flag */
-#define F_TOKEN     0x80 /* tag name found */
+#define S_STATES    0xF0
 
 typedef struct Glnk Glnk;
-struct Glnk { Glnk *next; void *data; WORD level; };
+struct Glnk { Glnk *next; void *data; };
 
 typedef struct SML_ParserStruct {
   void *ud;                /* userdata */
@@ -71,9 +70,9 @@ typedef struct SML_ParserStruct {
   int  level;
 } *SML_Parser;
 
-#define SML_GetCurrentLineNumber(p)     ((p)->r + 1)
-#define SML_GetCurrentColumnNumber(p)   ((p)->c + 1)
-#define SML_GetCurrentByteIndex(p)      ((p)->i + 1)
+#define SML_GetCurrentLineNumber(p)     ((p)->r)
+#define SML_GetCurrentColumnNumber(p)   ((p)->c)
+#define SML_GetCurrentByteIndex(p)      ((p)->i)
 
 enum MPState { /* parser status */
   MPSok,       /* state while parsing */
@@ -84,8 +83,8 @@ enum MPState { /* parser status */
 
 SML_Parser    SML_ParserCreate (void *ud, int mode, const char *ext);
 enum MPState  SML_Parse        (SML_Parser p, const char *s, int len);
-const char   *SML_ErrorString  (SML_Parser p);
 void          SML_ParserFree   (SML_Parser p);
 
+extern const char *SML_ErrorString[];
 #endif
 /*vim:ts=4:sw=4:sts=4:et:fen:fdm=marker:fmr={{{,}}}:fdl=1:cms=*/
