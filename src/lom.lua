@@ -25,15 +25,28 @@ local lom = { -- doctree for files, user's management {{{
 
 local docs = lom.doc -- xml object list (hidden upvalue)
 
+local function lsmp2lomAttr (attr) -- {{{
+    for i = 1, #attr do
+        -- local key, val = strmatch(attr[i], "^([^=]*)=?(.*)$")
+        local key, val = strmatch(attr[i], "^([^=]*)=?(.*)$")
+        val = strmatch(val, "^'(.*)'$") or strmatch(val, '^"(.*)"$') or val
+        attr[key] = val or false
+        attr[i] = nil
+    end
+    return attr
+end -- }}}
+
 local function scheme (p, name, attr) -- {{{
     local stack = p:getcallbacks().stack
     -- print("scheme ("..name..") "..tconcat(attr, '_'))
-    -- tinsert(stack, {['.'] = name, ['@'] = #attr > 0 and attr or nil})
+    stack[#stack]['+'] = stack[#stack]['+'] or {}
+    tinsert(stack[#stack]['+'], {name,
+        (strgsub(strgsub(tconcat(attr, ' '), '< ', '<'), ' >', '>'))})
 end -- }}}
 local function starttag (p, name, attr) -- {{{
     -- print("start ("..name..") "..tconcat(attr, '_'))
     local stack = p:getcallbacks().stack
-    tinsert(stack, {['.'] = name, ['@'] = #attr > 0 and attr or nil})
+    tinsert(stack, {['.'] = name, ['@'] = #attr > 0 and lsmp2lomAttr(attr) or nil})
 end -- }}}
 local function endtag (p, name) -- {{{
     -- print("end ("..name..")")
@@ -59,10 +72,10 @@ local function comment (p, txt) -- {{{
     local stack = p:getcallbacks().stack
     tinsert(stack[#stack], '\0'..txt)
 end -- }}}
-local function extension (p, txt) -- {{{
-    -- print("comment ("..txt..") ")
+local function extension (p, name, txt) -- {{{
+    -- print("ext: "..name.."("..txt..")")
     local stack = p:getcallbacks().stack
-    tinsert(stack[#stack], '\0'..txt)
+    tinsert(stack[#stack], '\0'..name..'\0'..txt)
 end -- }}}
 
 local function parse (o, txt) -- friend function {{{
@@ -239,6 +252,7 @@ local dom = class { -- lua document object model {{{
     ['&'] = false; -- xlink table
     ['?'] = false; -- errors
     ['*'] = false; -- module
+    ['+'] = false; -- misc info
 
     ['<'] = function (o, spec, mode) --{{{
         if type(spec) == 'table' then -- partial table-tree (0: data/stamp)
@@ -254,7 +268,7 @@ local dom = class { -- lua document object model {{{
                 CharacterData = mode < 0 and text or cleantext,
                 Comment = comment,
                 Extension = extension,
-                mode = 15,
+                mode = 7,
                 ext = "<?php ?>",
                 stack = {o} -- {{}}
             }
