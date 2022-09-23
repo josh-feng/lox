@@ -47,7 +47,7 @@ We will see if running lua inside a browser (console) is possible.
 
 
 - lua >= 5.1
-- pool: <https://github.com/josh-feng/pool.git>
+- pool: <https://github.com/josh-feng/pool>
 - ~~luaExpat: <http://www.keplerproject.org/luaexpat> or <https://github.com/LuaDist/luaexpat>~~
 - ~~posix <https://github.com/luaposix/luaposix/> (required by `us.lua`)~~
 
@@ -297,16 +297,9 @@ XML expat coding reference:
 
 TODO
 
-- level/extension
-- call backs
-- attr handling
-- error handling
-- makefile
-- lom
-  - attr handling
-- xml, html examples
 - us.lua
 - XmlObject
+- makefile
+- xml, html examples
 - README
-- luarocks
-
+- error handling
