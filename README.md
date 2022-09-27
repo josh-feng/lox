@@ -95,6 +95,7 @@ class {
     ['&'] = false; -- xlink table
     ['?'] = false; -- errors
     ['*'] = false; -- module
+    ['+'] = false; -- extension
 }
 ```
 
@@ -201,6 +202,13 @@ print(doc_b:select('b/c'):drop())
 Lox's dom sometimes has a tag link entry, which is a table and contains `["&"][0]`. It is the time-stamp for building xlinks.
 
 Lox's dom support the following methods: `parse`, `xpath`, `drop`, and `select`.
+
+
+xpath examples:
+
+unit|example|description
+------|-----|------
+\#|\[id="x",3,proc="reader"\]|the 3rd element
 
 ### Examples
 
