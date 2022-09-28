@@ -1,5 +1,7 @@
 #!/usr/bin/env lua
 -- ===================================================================== --
+-- Josh Feng (C) MIT license 2022
+-- ===================================================================== --
 local class = require("pool")
 local lom = require("lom")
 local we = require("us")
@@ -15,7 +17,7 @@ local we = require("us")
 -- @param engine    engine object
 -- @return          this basic class
 local XmlObject = class { -- class module paradigm
-    id = "";
+    id = "$Id:$";   -- version control
     node = false;   -- lom
     engine = false; -- engine class
 
