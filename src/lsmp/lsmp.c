@@ -64,7 +64,7 @@ new --> parser
   Comment = comment,
   Extension = extension,
   mode = flags,
-  ext = "<?php ?>",
+  ext = '<?php ?> <%= %>',
   stack = {o} -- {{}}
 */
 
@@ -84,17 +84,17 @@ SML_Parser SML_ParserCreate (void *ud, int mode, const char *ext) {
       if (*s <= ' ' || *s > '~') c++;
       s++;
     }
-    char **psz = (char **) malloc((size_t) ++c);
+    char **psz = (char **) malloc(sizeof(char *) * (++c));
     p->szExts = (const char **) psz;
     *psz++ = s = (char *) malloc((size_t) (s - ext) + 1);
     while ((*s++ = *ext)) {
       if (*ext <= ' ' || *ext > '~') *((*psz++ = s) - 1) = '\0';
       ext++;
     }
-    p->Exts = c >>= 1;
-    p->lszExts = (char *) malloc(c);
-    while (c--)
-    p->lszExts[c] = (char) strlen(p->szExts[2 * c + 1]);
+    *(s - 1) = '\0';
+    p->Exts = (c >>= 1);
+    p->lszExts = (char *) malloc((size_t) c);
+    while (c--) p->lszExts[c] = (char) strlen(p->szExts[2 * c + 1]);
   }
   else {
     p->szExts = NULL;
@@ -110,7 +110,7 @@ SML_Parser SML_ParserCreate (void *ud, int mode, const char *ext) {
 
 void SML_ParserFree (SML_Parser p) {
   free(p->buf);
-  if (p->szExts) {
+  if (p->Exts) {
     free((void *)(*(p->szExts)));
     free(p->szExts);
     free(p->lszExts);
@@ -350,7 +350,7 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
         while (c != e) {
           if (*c == '>') {
             if (p->elem) { /* ext tag */
-              int l = p->lszExts[p->iExt];
+              int l = p->lszExts[p->iExt * 2 + 1];
               if (0 == strncmp(c - l + 1, p->szExts[p->iExt], l)) {
                 *(c - l + 1) = '\0';
                 p->fx(p->ud, p->elem, s, c - l + 1 - s);

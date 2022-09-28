@@ -273,7 +273,7 @@ local dom = class { -- lua document object model {{{
                 Comment = comment,
                 Extension = extension,
                 mode = mode,
-                ext = "<?php ?> <%= %>", -- weird stuff
+                ext = '<?php ?> <%= %>', -- weird stuff
                 singleton = singleton,
                 stack = {o} -- {{}}
             }
