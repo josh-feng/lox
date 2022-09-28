@@ -1,10 +1,10 @@
 #!/usr/bin/env lua
 -- ================================================================== --
--- useful stuff (us:utility subroutine) on top of 'posix' module
+-- useful stuff (us:utility subroutine) Josh Feng (C) MIT license 2022
 -- ================================================================== --
 local we = {} -- working environment
 
-we.stamp, we.posix = pcall(require, 'posix')
+we.stamp, we.posix = pcall(require, 'posix') -- return status and package
 
 local strgsub, strsub, strgmatch, strmatch, strfind =
     string.gsub, string.sub, string.gmatch, string.match, string.find
@@ -40,10 +40,9 @@ we.dbg = function (msg) if we.debug then we.info(msg, 'DBG:') end end
 -- ================================================================== --
 -- ================  EXTERNAL SUBPROCESS COMMAND   ================== --
 -- ================================================================== --
-
 we.popen = function (datastr, cmd) -- {{{ status, out, err = we.popen(in, cmd)
-    if not (posix or we.posix) then return 'Not supported' end
-    local posix = posix or we.posix
+    local posix = we.posix or posix
+    if not posix then return 'Not supported' end
     --  thread
     --  +--------+
     --  | i-rw-> | pipe (is uni-directional)
@@ -262,12 +261,19 @@ we.check = function (v) -- {{{ -- check v is true or false
 end -- }}}
 -- ================================================================== --
 local function var2str (value, key, ctrl) -- {{{ emit variables in lua
-    key = (type(key) == 'string' and strfind(key, '[^_%w]')) and '["'..key..'"]' or key
-    local assign = type(key) == 'number' and '' or key..' = '
+    key = (type(key) == 'string' and strfind(key, '[^_%w]')) and '["'..key..'"]' or
+          (type(key) == 'boolean' and '['..tostring(key)..']' or key)
+
+    local assign = (key == nil) and ""
+        or (type(key) == 'number' and '['..tostring(key)..']' or key)..' = '
+
     if type(value) == 'number' then return assign..value end
     if type(value) == 'string' then return assign..'"'..strgsub(value, '"', '\\"')..'"' end
     if type(value) ~= 'table' then return '' end
-    tinsert(ctrl, type(key) == 'number' and '['..key..']' or key) -- increase the depth
+
+    -- tinsert(ctrl, type(key) == 'number' and '['..key..']' or key) -- increase the depth
+    tinsert(ctrl, key or '') -- increase the depth
+
     local extdef, keyhead = ''
     if ctrl.ext then -- the depths to external {{{
         for _ = 1, #(ctrl.ext) do
@@ -291,12 +297,14 @@ local function var2str (value, key, ctrl) -- {{{ emit variables in lua
     if #value > 0 then -- {{{
         if keyhead then
             for i = #value, 1, -1 do -- {{{
-                local v = var2str(value[i], i, ctrl)
+                -- local v = var2str(value[i], i, ctrl)
+                local v = var2str(value[i], nil, ctrl)
                 if v ~= '' then tinsert(ctrl.def, 1, keyhead..'['..i..'] = '..v) end
             end -- }}}
         else
             for i = 1, #value do -- {{{
-                local v = var2str(value[i], i, ctrl)
+                -- local v = var2str(value[i], i, ctrl)
+                local v = var2str(value[i], nil, ctrl)
                 if v ~= '' then tinsert(res, v) end
             end -- }}}
         end
@@ -320,7 +328,8 @@ local function var2str (value, key, ctrl) -- {{{ emit variables in lua
     if #kset > 0 then -- {{{
         table.sort(kset)
         for i = 1, #kset do
-            local v = var2str(value[kset[kset[i]]], kset[i], ctrl)
+            local v = kset[kset[i]]
+            v = var2str(value[v], (type(v) == 'number' or type(v) == 'boolean') and v or kset[i], ctrl)
             if v ~= '' then -- {{{
                 if keyhead then -- recursive so must be the first
                     tinsert(ctrl.def, 1, keyhead..(strsub(v, 1, 1) == '[' and v or '.'..v))
@@ -354,7 +363,7 @@ we.var2str = function (value, key, ext) -- {{{
         end
         ctrl.ext = ext -- control table
     end -- }}}
-    return var2str(value, key or 0, ctrl)
+    return var2str(value, key, ctrl)
 end -- }}}
 -- ================================================================== --
 -- =====================  TABLES FUNCTIONS  ========================= --
