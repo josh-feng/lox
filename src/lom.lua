@@ -1,6 +1,6 @@
 #!/usr/bin/env lua
 -- ================================================================== --
--- LOM (Lua Object Model):
+-- LOM (Lua Object Model)              Josh Feng (C) MIT license 2022 --
 -- DOM: doc = {['.'] = tag; ['@'] = {}; ['&'] = {{}..}; '\0comment', ...}
 -- Usage example:
 --      lom = require('lom')
@@ -20,14 +20,13 @@ local mmin = math.min
 -- ================================================================== --
 local lom = { -- doctree for files, user's management {{{
     doc = {};
-    mp = require('lsmp') -- a Lua SAX to replace lxp
+    mp = require('lsmp') -- a simple/sloppy SAX to replace lxp
 }
 
 local docs = lom.doc -- xml object list (hidden upvalue)
 
-local function lsmp2lomAttr (attr) -- {{{
+local function lsmp2lomAttr (attr) -- {{{ parse lsmp attr table to lom attr table
     for i = 1, #attr do
-        -- local key, val = strmatch(attr[i], "^([^=]*)=?(.*)$")
         local key, val = strmatch(attr[i], "^([^=]*)=?(.*)$")
         val = strmatch(val, "^'(.*)'$") or strmatch(val, '^"(.*)"$') or val
         attr[key] = val or false
@@ -38,24 +37,22 @@ end -- }}}
 
 local function scheme (p, name, attr) -- {{{
     local stack = p:getcallbacks().stack
-    -- print("scheme ("..name..") "..tconcat(attr, '_'))
     stack[#stack]['+'] = stack[#stack]['+'] or {}
     tinsert(stack[#stack]['+'], {name,
         (strgsub(strgsub(tconcat(attr, ' '), '< ', '<'), ' >', '>'))})
 end -- }}}
 local function starttag (p, name, attr) -- {{{
-    -- print("start ("..name..") "..tconcat(attr, '_'))
     local stack = p:getcallbacks().stack
-    tinsert(stack, {['.'] = name, ['@'] = #attr > 0 and lsmp2lomAttr(attr) or nil})
+    tinsert((stack.singleton and stack.singleton[name]) and stack[#stack] or stack,
+        {['.'] = name, ['@'] = #attr > 0 and lsmp2lomAttr(attr) or nil})
 end -- }}}
 local function endtag (p, name) -- {{{
-    -- print("end ("..name..")")
     local stack = p:getcallbacks().stack
     local element = tremove(stack)
-    -- assert(element['.'] == name)
     tinsert(stack[#stack], element)
 end -- }}}
 local function cleantext (p, txt) -- {{{
+    txt = strgsub(txt, '&nbsp;', '')
     if strfind(txt, '%S') then
         txt = strmatch(txt, '^.*%S')
         local stack = p:getcallbacks().stack
@@ -63,17 +60,14 @@ local function cleantext (p, txt) -- {{{
     end
 end -- }}}
 local function text (p, txt) -- {{{
-    -- print("text ("..txt..") ")
     local stack = p:getcallbacks().stack
     tinsert(stack[#stack], txt)
 end -- }}}
 local function comment (p, txt) -- {{{
-    -- print("comment ("..txt..") ")
     local stack = p:getcallbacks().stack
     tinsert(stack[#stack], '\0'..txt)
 end -- }}}
 local function extension (p, name, txt) -- {{{
-    -- print("ext: "..name.."("..txt..")")
     local stack = p:getcallbacks().stack
     tinsert(stack[#stack], '\0'..name..'\0'..txt)
 end -- }}}
@@ -83,7 +77,7 @@ local function parse (o, txt) -- friend function {{{
     local status, msg, line, col, pos = p:parse(txt) -- pass nil if failed
     if not (txt and status) then
         if not status then o['?'] = {msg..' #'..line} end
-        p:close() -- seems destroy the mp obj
+        p:close() -- mp obj is destroyed
         o[0] = nil
         o.parse = nil
     end
@@ -168,7 +162,8 @@ local function procXpath (path) -- {{{ XPath language parser
         local elem, attr
         elem, path = strmatch(path, '^(/?[%w_:]*)(.*)$')
         tinsert(t, elem)
-        if strsub(path, 1, 1) == '[' then
+
+        if strsub(path, 1, 1) == '[' then -- heuristic xpath parser
             elem = {}
             while strsub(path, 1, 1) ~= ']' do
                 attr, path = strmatch(strsub(path, 2, #path), '^([_%w]*)(.*)$')
@@ -197,6 +192,7 @@ local function procXpath (path) -- {{{ XPath language parser
         else
             elem = false
         end
+
         tinsert(t, elem) -- {elem, false; elem, {attr1, ...}; ...}
     until path == ''
     -- print('path =', we.var2str(t)) -- debug
@@ -227,6 +223,7 @@ end -- }}}
 
 local function wXml (node) -- {{{
     if 'string' == type(node) then
+        -- TODO extension
         return strsub(node, 1, 1) ~= '\0' and node or '<!--'..node..'-->'
     end
     local res = {}
@@ -243,33 +240,41 @@ local function wXml (node) -- {{{
     return strgsub(tconcat(res, '\n'), '\n', '\n  ')..'\n</'..node['.']..'>' -- indent 2
 end -- }}}
 
--- html no end tag
-local singleton = 'area base br col command embed hr img input keygen link meta param source track wbr'
-
 local dom = class { -- lua document object model {{{
     ['.'] = false; -- tag name
     ['@'] = false; -- attr
     ['&'] = false; -- xlink table
     ['?'] = false; -- errors
     ['*'] = false; -- module
-    ['+'] = false; -- misc info
+    ['+'] = false; -- misc info (definition/declaration)
 
-    ['<'] = function (o, spec, mode) --{{{
+    ['<'] = function (o, spec, mode, singleton) --{{{
+
+        mode = tonumber(mode) or 7
+        singleton = tostring(singleton) or
+            'area base br col command embed hr img input keygen link meta param source track wbr'
+        if singleton then
+            local res = {}
+            for st in strgmatch(singleton, '%S+') do res[st] = true end
+            singleton = res
+        end
+
         if type(spec) == 'table' then -- partial table-tree (0: data/stamp)
             for k, v in pairs(spec) do
-                if k ~= 0 then o[k] = v end -- new data setting
+                if type(k) == 'number' or o[k] then o[k] = v end -- new data setting
             end
         elseif type(spec) == 'string' then -- '' for text
-            mode = tonumber(mode) or 0
+
             local p = lom.mp.new {
                 Scheme = scheme,
                 StartElement = starttag,
                 EndElement = endtag,
-                CharacterData = mode < 0 and text or cleantext,
+                CharacterData = mode > 7 and text or cleantext,
                 Comment = comment,
                 Extension = extension,
-                mode = 7,
-                ext = "<?php ?>",
+                mode = mode,
+                ext = "<?php ?> <%= %>", -- weird stuff
+                singleton = singleton,
                 stack = {o} -- {{}}
             }
 
@@ -279,16 +284,8 @@ local dom = class { -- lua document object model {{{
             else
                 local file, msg = io.open(spec, 'r')
                 if file then -- clean up xml/html mess
-                    msg = strgsub(file:read('*all'), '&nbsp;', '')
+                    msg = file:read('*all')
                     file:close()
-                    msg = strgsub(strgsub(msg, '<script[^>]*>%s*</script>', ''),
-                        '<script%f[%W]([^>]*)>%s*([^<].-)</script>',
-                        '<script%1><![CDATA[%2]]></script>')
-                    if mode > 0 then -- html replay no-end tag with />
-                        for st in strgmatch(singleton, '%S+') do
-                            msg = strgsub(msg, '<('..st..'%f[%W][^>]-)/?>', '<%1 />')
-                        end
-                    end
                     local status, msg, line, col, pos = p:parse(msg)
                     if status then status, msg, line = p:parse() end
                     if not status then o['?'] = {msg..' #'..line} else p:close() end
