@@ -264,7 +264,7 @@ local function var2str (value, key, fmt) -- {{{ emit variables in lua
     key = (type(key) == 'string' and strfind(key, '[^_%w]')) and '["'..key..'"]' or
           (type(key) == 'boolean' and '['..tostring(key)..']' or key)
 
-    local assign = (fmt.idx) and ""
+    local assign = ((key == nil) or fmt.idx) and "" -- TODO
         or (type(key) == 'number' and '['..tostring(key)..']' or key)..' = '
     fmt.idx = false
 
@@ -362,7 +362,10 @@ we.var2str = function (value, key, ext) -- {{{
         fmt.len = ext.len or fmt.len -- max txt width
         fmt.num = ext.num or fmt.num -- max items in one line table
         for k, v in pairs(ext) do
-            if type(k) == 'string' and strmatch(k, '^L%d+$') and tonumber(v) and v > 1 then fmt[k] = v end
+            if type(k) == 'string' and strmatch(k, '^L%d+$') and tonumber(v) and v > 1 then
+                fmt[k] = v
+                key = key or 'var_'..tostring(value) -- TODO
+            end
         end
         fmt.ext = ext -- control table
     end -- }}}
