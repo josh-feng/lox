@@ -77,6 +77,7 @@ local function parse (o, txt) -- friend function {{{
     local status, msg, line, col, pos = p:parse(txt) -- pass nil if failed
     if not (txt and status) then
         if not status then o['?'] = {msg..' #'..line} end
+        -- TODO tag structure
         p:close() -- mp obj is destroyed
         o[0] = nil
         o.parse = nil
@@ -288,6 +289,7 @@ local dom = class { -- lua document object model {{{
                     file:close()
                     local status, msg, line, col, pos = p:parse(msg)
                     if status then status, msg, line = p:parse() end
+                    -- TODO tag structure
                     if not status then o['?'] = {msg..' #'..line} else p:close() end
                 else
                     o['?'] = {msg}
@@ -464,7 +466,7 @@ end
 -- ================================================================== --
 -- service for checking object model and demo/debug -- {{{
 if arg and #arg > 0 and strfind(arg[0] or '', 'lom.lua$') then
-    local doc = lom(arg[1] == '-' and '' or arg[1], arg[1] and strfind(arg[1], '%.html$'))
+    local doc = lom(arg[1] == '-' and '' or arg[1])
     if arg[1] == '-' then doc:parse(io.stdin:read('a')):parse() end
     -- lom(true)
     print(doc['?'] and tconcat(doc['?'], '\n') or doc:drop())
