@@ -10,6 +10,8 @@
 
 #include "lsmp.h"
 
+// #define DEBUG 3
+
 #ifdef DEBUG
 #define DBG(l,x);  if (DEBUG >= l) {x}
 #else
@@ -167,9 +169,9 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
 
   BYTE escape = p->mode & M_ESCAPE;
   BYTE sloppy = p->mode & M_SLOPPY;
-  DBG(2, printf("%d (%x, %x, %x) %d\n", p->mode, s, c, e, len););
+  DBG(2, printf("%x (%x, %x, %x) %d\n", p->mode, s, c, e, len););
 
-  while (c != e) {
+  do {
     switch (p->mode & S_STATES) {
       case S_TEXT: /* text {{{ */
         while ((c != e) && (('<' != *c) ||
@@ -228,8 +230,8 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
               }
               s = (const char *) c + 1;
             }
-            else if (*c == '>') {
-              BYTE closing = 0;
+            else if (*c == '>' || (c == e && fEnd)) {
+              BYTE closing = (c == e && fEnd); /* or end of parsing */
               Glnk *attr;
               if (p->level > 0) {
                 p->level--;
@@ -263,9 +265,8 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
                 }
 
                 if (bc == '/') { /* clean attribute */
-                  attr = p->attr;
-                  while (attr) { /* clean attr or error if strict */
-                    Glnk *tmp = attr; attr = attr->next; stGlnkPush(tmp);
+                  while (p->attr) { /* clean attr or error if strict */
+                    attr = p->attr; p->attr = attr->next; stGlnkPush(attr);
                   }
                   p->fe(p->ud, p->elem);
                 }
@@ -289,6 +290,10 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
             }
             incr(c, p);
           }
+          if (fEnd) { /* TODO */
+            if (c != s) {
+            }
+          }
         }
         else { /* searching token */
           while (c != e) {
@@ -296,7 +301,7 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
                 ((c == s + 8) && 0 == strncmp(s, "<![CDATA[", 9))) {
               p->mode = (p->mode & M_MODES) | S_CDATA;
               incr(c, p);
-              s = (const char *) c;
+              /* s = (const char *) c; */
               break;
             }
             else if ((bc = *c) && (bc <= ' ' || bc == 0x7F)) { /* space or del */
@@ -332,6 +337,10 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
             p->c++;
             p->i++;
           }
+          if (fEnd) { /* TODO */
+            if (c != s) {
+            }
+          }
         }
         break; /* markup }}} */
 
@@ -343,6 +352,10 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
           p->mode = (p->mode & M_MODES) | S_MARKUP | F_TOKEN;
           p->quote = q = '\0'; /* reset quote */
           incr(c, p);
+        }
+        else if (fEnd) { /* TODO */
+          if (c != s) {
+          }
         }
         break; /* string in tag }}} */
 
@@ -375,20 +388,27 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
           incr(c, p);
           s = (const char *) c;
         }
+        else if (fEnd) { /* TODO */
+          if (c != s) {
+          }
+        }
         break; /* CDATA, COMMENT, and other Extensions }}} */
     }
-  }
+  } while (c != e);
 
   if (fEnd) {
+    DBG(2, printf("End %x (%x, %x, %x) %d\n", p->mode, s, c, e, len););
     p->mode = (M_MODES & p->mode) | ((c == e) ? S_DONE : S_ERROR);
     return (c == e) ? MPSfinished : MPSerror;
   }
+  if ((p->len = e - s)) memmove(p->buf, s, p->len);
   return MPSok;
 } /* }}} */
 
 /***************************************************************/
 /********************* lua library related *********************/
 /***************************************************************/
+/* lua ud + evnt handlers {{{ */
 
 #include "lua.h"
 #include "lauxlib.h"
@@ -440,7 +460,7 @@ static int getHandle (lsmp_ud *mpu, const char *handle) {
   return 1;
 }
 
-/*********** SAX event handler ************ ud + string {{{ */
+/*********** SAX event handler *************/
 
 void f_CharData (void *ud, const char *s, int len) {
   lsmp_ud *mpu = (lsmp_ud *) ud;
