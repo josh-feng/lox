@@ -260,30 +260,31 @@ we.check = function (v) -- {{{ -- check v is true or false
     return (v == 'true') or (v == 'yes') or (v == 'y')
 end -- }}}
 -- ================================================================== --
-local function var2str (value, key, ctrl) -- {{{ emit variables in lua
+local function var2str (value, key, fmt) -- {{{ emit variables in lua
     key = (type(key) == 'string' and strfind(key, '[^_%w]')) and '["'..key..'"]' or
           (type(key) == 'boolean' and '['..tostring(key)..']' or key)
 
-    local assign = (key == nil) and ""
+    local assign = (fmt.idx) and ""
         or (type(key) == 'number' and '['..tostring(key)..']' or key)..' = '
+    fmt.idx = false
 
     if type(value) == 'number' then return assign..value end
     if type(value) == 'string' then return assign..'"'..strgsub(value, '"', '\\"')..'"' end
     if type(value) ~= 'table' then return '' end
 
-    -- tinsert(ctrl, type(key) == 'number' and '['..key..']' or key) -- increase the depth
-    tinsert(ctrl, key or '') -- increase the depth
+    -- increase the depth
+    tinsert(fmt, type(key) == 'number' and '['..key..']' or key or '')
 
     local extdef, keyhead = ''
-    if ctrl.ext then -- the depths to external {{{
-        for _ = 1, #(ctrl.ext) do
-            if #ctrl == ctrl.ext[_] then
-                keyhead = strgsub(tconcat(ctrl, "."), '%.%[', '[')
+    if fmt.ext then -- the depths to external {{{
+        for _ = 1, #(fmt.ext) do
+            if #fmt == fmt.ext[_] then
+                keyhead = strgsub(tconcat(fmt, "."), '%.%[', '[')
                 break
             end
         end
     end -- }}}
-    local res, kset, tmp1 = {}, {}, ctrl['L'..#ctrl]
+    local res, kset, tmp1 = {}, {}, fmt['L'..#fmt]
     for k, v in pairs(value) do
         if type(k) ~= 'number' or k < 1 or k > #value  then
             v = tostring(k)
@@ -297,19 +298,21 @@ local function var2str (value, key, ctrl) -- {{{ emit variables in lua
     if #value > 0 then -- {{{
         if keyhead then
             for i = #value, 1, -1 do -- {{{
-                -- local v = var2str(value[i], i, ctrl)
-                local v = var2str(value[i], nil, ctrl)
-                if v ~= '' then tinsert(ctrl.def, 1, keyhead..'['..i..'] = '..v) end
+                fmt.idx = true
+                local v = var2str(value[i], i, fmt)
+                -- local v = var2str(value[i], nil, fmt)
+                if v ~= '' then tinsert(fmt.def, 1, keyhead..'['..i..'] = '..v) end
             end -- }}}
         else
             for i = 1, #value do -- {{{
-                -- local v = var2str(value[i], i, ctrl)
-                local v = var2str(value[i], nil, ctrl)
+                fmt.idx = true
+                local v = var2str(value[i], i, fmt)
+                -- local v = var2str(value[i], nil, fmt)
                 if v ~= '' then tinsert(res, v) end
             end -- }}}
         end
-        if tmp1 and (#res > ctrl['L'..#ctrl]) then -- level L# 2D table @ column
-            local w, m = ctrl['L'..#ctrl], {} -- {{{
+        if tmp1 and (#res > fmt['L'..#fmt]) then -- level L# 2D table @ column
+            local w, m = fmt['L'..#fmt], {} -- {{{
             for i = 0, #res - 1 do
                 local l = string.len(tostring(res[i + 1]))
                 m[i % w] = (m[i % w] and m[i % w] >= l) and m[i % w] or l
@@ -321,7 +324,7 @@ local function var2str (value, key, ctrl) -- {{{ emit variables in lua
         else --
             tmp1 = false
             res = tconcat(res, ',\n')
-            if string.len(res) < ctrl.len then res = strgsub(res, '\n', ' ') end
+            if string.len(res) < fmt.len then res = strgsub(res, '\n', ' ') end
             res = {res}
         end
     end -- }}}
@@ -329,10 +332,10 @@ local function var2str (value, key, ctrl) -- {{{ emit variables in lua
         table.sort(kset)
         for i = 1, #kset do
             local v = kset[kset[i]]
-            v = var2str(value[v], (type(v) == 'number' or type(v) == 'boolean') and v or kset[i], ctrl)
+            v = var2str(value[v], (type(v) == 'number' or type(v) == 'boolean') and v or kset[i], fmt)
             if v ~= '' then -- {{{
                 if keyhead then -- recursive so must be the first
-                    tinsert(ctrl.def, 1, keyhead..(strsub(v, 1, 1) == '[' and v or '.'..v))
+                    tinsert(fmt.def, 1, keyhead..(strsub(v, 1, 1) == '[' and v or '.'..v))
                 else
                     tinsert(res, v)
                 end
@@ -340,11 +343,11 @@ local function var2str (value, key, ctrl) -- {{{ emit variables in lua
         end
     end -- }}}
     kset = #res
-    tremove(ctrl)
+    tremove(fmt)
     res = tconcat(res, ',\n')
-    if #ctrl == 0 and #(ctrl.def) > 0 then extdef = '\n'..tconcat(ctrl.def, '\n') end
+    if #fmt == 0 and #(fmt.def) > 0 then extdef = '\n'..tconcat(fmt.def, '\n') end
     if not strfind(res, '\n') then return assign..'{'..res..'}'..extdef end
-    if (not tmp1) and string.len(res) < ctrl.len and kset < ctrl.num then
+    if (not tmp1) and string.len(res) < fmt.len and kset < fmt.num then
         return assign..'{'..strgsub(res, '\n', ' ')..'}'..extdef
     end
     tmp1 = string.rep(' ', 4)
@@ -354,16 +357,16 @@ end -- }}}
 we.var2str = function (value, key, ext) -- {{{
     -- e.g. print(we.var2str(a, 'a', {1, L4=3}))
     -- e.g. print(we.var2str(a, 'a', {1, ['a.b.1.3.5'] = 'ab', ['a.b.1.3.5'] = 13, }))
-    local ctrl = {def = {}, len = 111, num = 11} -- external definitions m# = cloumn_num
+    local fmt = {def = {}, len = 120, num = 12} -- external definitions m# = cloumn_num
     if type(ext) == 'table' then -- {{{
-        ctrl.len = ext.len or ctrl.len -- max txt width
-        ctrl.num = ext.num or ctrl.num -- max items in one line table
+        fmt.len = ext.len or fmt.len -- max txt width
+        fmt.num = ext.num or fmt.num -- max items in one line table
         for k, v in pairs(ext) do
-            if type(k) == 'string' and strmatch(k, '^L%d+$') and tonumber(v) and v > 1 then ctrl[k] = v end
+            if type(k) == 'string' and strmatch(k, '^L%d+$') and tonumber(v) and v > 1 then fmt[k] = v end
         end
-        ctrl.ext = ext -- control table
+        fmt.ext = ext -- control table
     end -- }}}
-    return var2str(value, key, ctrl)
+    return var2str(value, key, fmt)
 end -- }}}
 -- ================================================================== --
 -- =====================  TABLES FUNCTIONS  ========================= --
