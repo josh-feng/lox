@@ -10,8 +10,6 @@
 
 #include "lsmp.h"
 
-// #define DEBUG 3
-
 #ifdef DEBUG
 #define DBG(l,x);  if (DEBUG >= l) {x}
 #else
@@ -406,6 +404,7 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
   if (fEnd) {
     DBG(2, printf("End %x (%x, %x, %x) %d\n", p->mode, s, c, e, len););
     p->mode = (M_MODES & p->mode) | ((c == e) ? S_DONE : S_ERROR);
+    p->fz(p->ud);
     return (c == e) ? MPSfinished : MPSerror;
   }
   if ((p->len = e - s)) memmove(p->buf, s, p->len);
@@ -468,6 +467,11 @@ static int getHandle (lsmp_ud *mpu, const char *handle) {
 }
 
 /*********** SAX event handler *************/
+
+void f_Closing (void *ud) {
+  lsmp_ud *mpu = (lsmp_ud *) ud;
+  if (getHandle(mpu, ClosingKey)) docall(mpu, 1, 0);
+}
 
 void f_CharData (void *ud, const char *s, int len) {
   lsmp_ud *mpu = (lsmp_ud *) ud;
@@ -631,6 +635,7 @@ static int lsmp_creator (lua_State *L) {
   p->fc = f_Comment;
   p->fd = f_Scheme;
   p->fx = f_Extension;
+  p->fz = f_Closing;
   return 1;
 }
 

@@ -15,6 +15,7 @@ typedef __uint8_t  BYTE;
 #define CharacterDataKey  "CharacterData"
 #define CommentKey        "Comment"
 #define ExtensionKey      "Extension"
+#define ClosingKey        "Closing"
 
 typedef void (*SML_SchemeHdlr)       (void *ud, const char *name, const char **atts);
 typedef void (*SML_StartElementHdlr) (void *ud, const char *name, const char **atts);
@@ -22,6 +23,7 @@ typedef void (*SML_EndElementHdlr)   (void *ud, const char *name);
 typedef void (*SML_CharDataHdlr)     (void *ud, const char *s, int len);
 typedef void (*SML_CommentHdlr)      (void *ud, const char *s, int len);
 typedef void (*SML_ExtensionHdlr)    (void *ud, const char *name, const char *s, int len);
+typedef void (*SML_ClosingHdlr)      (void *ud);
 
 /* mode */
 #define M_STRICT    0x00
@@ -57,6 +59,7 @@ typedef struct SML_ParserStruct {
   SML_CommentHdlr      fc; /* comment <!-- --> */
   SML_SchemeHdlr       fd; /* definition <!* [] > */
   SML_ExtensionHdlr    fx; /* extension <? ?> */
+  SML_ClosingHdlr      fz; /* doc closing */
 
   BYTE mode;  /* mode + state + flag */
   char quote; /* "' */

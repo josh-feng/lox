@@ -48,8 +48,10 @@ local function starttag (p, name, attr) -- {{{
 end -- }}}
 local function endtag (p, name) -- {{{
     local stack = p:getcallbacks().stack
-    local element = tremove(stack)
-    tinsert(stack[#stack], element)
+    if #stack > 1 then
+        local element = tremove(stack)
+        tinsert(stack[#stack], element)
+    end
 end -- }}}
 local function cleantext (p, txt) -- {{{
     txt = strgsub(txt, '&nbsp;', '')
@@ -71,13 +73,19 @@ local function extension (p, name, txt) -- {{{
     local stack = p:getcallbacks().stack
     tinsert(stack[#stack], '\0'..name..'\0'..txt)
 end -- }}}
+local function closing (p) -- {{{
+    local stack = p:getcallbacks().stack
+    while #stack > 1 do
+        local element = tremove(stack)
+        tinsert(stack[#stack], element)
+    end
+end -- }}}
 
 local function parse (o, txt) -- friend function {{{
     local p = o[0]
     local status, msg, line, col, pos = p:parse(txt) -- pass nil if failed
     if not (txt and status) then
         if not status then o['?'] = {msg..' #'..line} end
-        -- TODO tag structure
         p:close() -- mp obj is destroyed
         o[0] = nil
         o.parse = nil
@@ -273,6 +281,7 @@ local dom = class { -- lua document object model {{{
                 CharacterData = mode > 7 and text or cleantext,
                 Comment = comment,
                 Extension = extension,
+                Closing = closing,
                 mode = mode,
                 ext = '<?php ?> <%= %>', -- weird stuff
                 singleton = singleton,
@@ -289,7 +298,6 @@ local dom = class { -- lua document object model {{{
                     file:close()
                     local status, msg, line, col, pos = p:parse(msg)
                     if status then status, msg, line = p:parse() end
-                    -- TODO tag structure
                     if not status then o['?'] = {msg..' #'..line} else p:close() end
                 else
                     o['?'] = {msg}
