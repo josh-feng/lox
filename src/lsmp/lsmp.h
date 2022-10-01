@@ -35,11 +35,12 @@ typedef void (*SML_ExtensionHdlr)    (void *ud, const char *name, const char *s,
 
 /* state */
 #define S_TEXT      0x00
-#define S_CDATA     0x10 /* CDATA, COMMENT, and Extension*/
-#define S_MARKUP    0x20
-#define S_STRING    0x30 /* in MARKUP */
-#define S_ERROR     0x40
-#define S_DONE      0x50
+#define S_CDATA     0x10 /* CDATA, and Extension */
+#define S_COMMENT   0x20 /* COMMENT */
+#define S_MARKUP    0x30
+#define S_STRING    0x40 /* in MARKUP */
+#define S_ERROR     0x50
+#define S_DONE      0x60
 #define S_STATES    0xF0
 
 typedef struct Glnk Glnk;
