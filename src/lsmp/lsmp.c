@@ -10,6 +10,8 @@
 
 #include "lsmp.h"
 
+// #define DEBUG 3
+
 #ifdef DEBUG
 #define DBG(l,x);  if (DEBUG >= l) {x}
 #else
@@ -218,32 +220,9 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
         **          '>' ==> S_TEXT
         ** <?php ?> Extensions
         */
-        if (p->mode & F_TOKEN) { /* token found */
+        if (p->mode & F_TOKEN) { /* token found {{{ */
           do {
-            if (*c == q || (!q && (*c == '"' || *c == '\''))) {
-              p->mode = (p->mode & M_MODES) | S_STRING;
-              p->quote = q = *c;
-              incr(c, p);
-              break;
-            }
-            else if (*c <= ' ' || *c == '<') { /* < or space */
-              BYTE opening = 0;
-              Glnk *attr;
-              if (*c == '<') {
-                p->level++;
-                opening = 1;
-              }
-              if (s != c) { /* collect attributes */
-                attr = stGlnkPop(); attr->next = p->attr; p->attr = attr;
-                attr->data = (void *) s; *c = '\0';
-              }
-              if (opening) {
-                attr = stGlnkPop(); attr->next = p->attr; p->attr = attr;
-                attr->data = (void *) mus;
-              }
-              s = (const char *) c + 1;
-            }
-            else if (*c == '>' || (c == e && fEnd)) {
+            if ((c == e && fEnd) || *c == '>') {
               BYTE closing = (c == e && fEnd); /* or end of parsing */
               Glnk *attr;
               if (p->level > 0) {
@@ -296,18 +275,48 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
                 free(p->elem);
                 p->elem = NULL;
                 p->mode = (p->mode & M_MODES) | S_TEXT;
-                incr(c, p);
-                s = (const char *) c;
+                if (c != e || !fEnd) {
+                  incr(c, p);
+                  s = (const char *) c;
+                }
                 break;
               }
             }
+            else if (*c == q || (!q && (*c == '"' || *c == '\''))) {
+              p->mode = (p->mode & M_MODES) | S_STRING;
+              p->quote = q = *c;
+              incr(c, p);
+              break;
+            }
+            else if (*c <= ' ' || *c == '<') { /* < or space */
+              BYTE opening = 0;
+              Glnk *attr;
+              if (*c == '<') {
+                p->level++;
+                opening = 1;
+              }
+              if (s != c) { /* collect attributes */
+                attr = stGlnkPop(); attr->next = p->attr; p->attr = attr;
+                attr->data = (void *) s; *c = '\0';
+              }
+              if (opening) {
+                attr = stGlnkPop(); attr->next = p->attr; p->attr = attr;
+                attr->data = (void *) mus;
+              }
+              s = (const char *) c + 1;
+            }
             incr(c, p);
           } while (c != e);
-        }
-
-        else { /* searching token */
+        } /* }}} */
+        else { /* searching token {{{ */
           do {
-            if ((c == s + 3) && 0 == strncmp(s, "<!--", 4)) {
+            if (c == e && fEnd) {
+              p->elem = strndup(s, c - s);
+              p->fs(p->ud, p->elem, SML_attr(p));
+              s = (const char *) c;
+              break;
+            }
+            else if ((c == s + 3) && 0 == strncmp(s, "<!--", 4)) {
               p->mode = (p->mode & M_MODES) | S_COMMENT;
               incr(c, p);
               s = (const char *) c;
@@ -335,7 +344,7 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
               DBG(1, printf("TOKEN1 (%s)%x\n", p->elem, p->mode););
               break;
             }
-            else if (bc == '>' || (c == e && fEnd)) {
+            else if (bc == '>') {
               if (c == ++s) { /* <> */
                 p->mode = (p->mode & M_MODES) | S_TEXT;
                 incr(c, p);
@@ -345,16 +354,14 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
                 p->elem = strndup(s, c - s);
                 DBG(1, printf("TOKEN2 (%s)%x\n", p->elem, p->mode););
               }
-              if (c == e && fEnd) p->fs(p->ud, p->elem, SML_attr(p));
-              else s = (const char *) c;
+              s = (const char *) c;
               break;
             }
             if (*(c++) == '\n') { p->n = p->c; p->r++; p->c = 0; }
             p->c++;
             p->i++;
           } while (c != e);
-
-        }
+        } /* }}} */
         break; /* markup }}} */
 
       case S_CDATA: case S_COMMENT: /* CDATA, COMMENT, and other Extensions {{{ */

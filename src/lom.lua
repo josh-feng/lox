@@ -18,8 +18,8 @@ local strrep, strgsub, strfind = string.rep, string.gsub, string.find
 local tinsert, tremove, tconcat = table.insert, table.remove, table.concat
 local mmin = math.min
 -- ================================================================== --
-local lom = { -- doctree for files, user's management {{{
-    doc = {};
+local lom = { -- {{{
+    doc = {}; -- doctree for files, user's management
     mp = require('lsmp') -- a simple/sloppy SAX to replace lxp
 }
 
@@ -28,14 +28,13 @@ local docs = lom.doc -- xml object list (hidden upvalue)
 local function lsmp2lomAttr (attr) -- {{{ parse lsmp attr table to lom attr table
     for i = 1, #attr do
         local key, val = strmatch(attr[i], "^([^=]*)=?(.*)$")
-        val = strmatch(val, "^'(.*)'$") or strmatch(val, '^"(.*)"$') or val
-        attr[key] = val or false
-        attr[i] = nil
+        attr[key] = we.trimq(val) or false
+        attr[i] = nil -- clean
     end
     return attr
 end -- }}}
 
-local function scheme (p, name, attr) -- {{{
+local function scheme (p, name, attr) -- {{{ definition/declaration
     local stack = p:getcallbacks().stack
     stack[#stack]['+'] = stack[#stack]['+'] or {}
     tinsert(stack[#stack]['+'], {name,
@@ -48,7 +47,7 @@ local function starttag (p, name, attr) -- {{{
 end -- }}}
 local function endtag (p, name) -- {{{
     local stack = p:getcallbacks().stack
-    if #stack > 1 then
+    if #stack > 1 then -- {o}
         local element = tremove(stack)
         tinsert(stack[#stack], element)
     end

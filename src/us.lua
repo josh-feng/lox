@@ -42,7 +42,7 @@ we.dbg = function (msg) if we.debug then we.info(msg, 'DBG:') end end
 -- ================================================================== --
 we.popen = function (datastr, cmd) -- {{{ status, out, err = we.popen(in, cmd)
     local posix = we.posix or posix
-    if not posix then return 'Not supported' end
+    if not posix then return 'Posix not supported' end
     --  thread
     --  +--------+
     --  | i-rw-> | pipe (is uni-directional)
@@ -159,6 +159,10 @@ we.strpm = function (str) -- pattern matching string {{{ -- escape: ().%+-*?[^$
         str = strgsub(str, s, '%'..s)
     end
     return str
+end -- }}}
+
+we.trimq = function (str) -- trim quotation mark {{{
+    return strmatch(str, "^'(.*)'$") or strmatch(str, '^"(.*)"$') or str
 end -- }}}
 
 we.trim = function (...) -- {{{ trim space
