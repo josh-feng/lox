@@ -20,7 +20,8 @@ local mmin = math.min
 -- ================================================================== --
 local lom = { -- {{{
     doc = {}; -- doctree for files, user's management
-    mp = require('lsmp') -- a simple/sloppy SAX to replace lxp
+    mp = require('lsmp'), -- a simple/sloppy SAX to replace lxp
+    singleton = 'area base br col command embed hr img input keygen link meta param source track wbr'
 }
 
 local docs = lom.doc -- xml object list (hidden upvalue)
@@ -37,8 +38,9 @@ end -- }}}
 local function scheme (p, name, attr) -- {{{ definition/declaration
     local stack = p:getcallbacks().stack
     stack[#stack]['+'] = stack[#stack]['+'] or {}
-    tinsert(stack[#stack]['+'], {name,
-        (strgsub(strgsub(tconcat(attr, ' '), '< ', '<'), ' >', '>'))})
+    attr[0] = name
+    tinsert(stack[#stack]['+'], attr)
+    -- tinsert(stack[#stack]['+'], {name, (strgsub(strgsub(tconcat(attr, ' '), '< ', '<'), ' >', '>'))})
 end -- }}}
 local function starttag (p, name, attr) -- {{{
     local stack = p:getcallbacks().stack
@@ -74,7 +76,7 @@ local function extension (p, name, txt) -- {{{
 end -- }}}
 local function closing (p) -- {{{
     local stack = p:getcallbacks().stack
-    while #stack > 1 do
+    while #stack > 1 do -- closing unmatched tags
         local element = tremove(stack)
         tinsert(stack[#stack], element)
     end
@@ -104,7 +106,6 @@ local function xPath (c, paths, doc, conti) -- {{{ return doc/xml-node table, en
     -- xpath syntax: NB: xpointer does not have standard treatment
     -- /A/B[@attr="val",@bb='4']
     -- anywhere/A/B[-3]/-2/3
-    -- anywhere = strsub(path, 1, 1) ~= '/'
     local tag = (strsub(path, 1, 1) ~= '/') and path or strsub(path, 2, #path)
     path = paths[2 * c]
 
@@ -207,19 +208,13 @@ local function procXpath (path) -- {{{ XPath language parser
     return t
 end -- }}}
 -- ================================================================== --
-local function xmlstr (s, fenc) -- {{{
-    -- encode: gzip -c | base64 -w 128
-    -- decode: base64 -i -d | zcat -f
-    -- return '<!-- base64 -i -d | zcat -f -->{{{'..
-    --     we.popen(s, 'we.gzip -c | base64 -w 128'):read('*all')..'}}}'
+local function xmlstr (s, fenc) -- {{{ enc: gzip -c | base64 -w 128 / dec: base64 -i -d | zcat -f
     s = tostring(s)
     if strfind(s, '\n') or (strlen(s) > 1024) then -- large text
         if fenc or strfind(s, ']]>') then -- enc flag or hostile strings
             local status, stdout, stderr = we.popen(s, 'gzip -c | base64 -w 128')
             return '<!-- base64 -i -d | zcat -f -->{{{'..stdout..'}}}'
         else
-            -- return (strfind(s, '"') or strfind(s, "'") or strfind(s, '&') or
-            --         strfind(s, '<') or strfind(s, '>')) and '<![CDATA[\n'..s..']]>' or s
             return (strfind(s, '&') or strfind(s, '<') or strfind(s, '>'))
                 and '<![CDATA[\n'..s..']]>' or s
         end
@@ -231,17 +226,21 @@ end -- }}}
 
 local function wXml (node) -- {{{
     if 'string' == type(node) then
-        -- TODO extension
+        -- TODO extension <?php ?> <%= %> etc
         return strsub(node, 1, 1) ~= '\0' and node or '<!--'..node..'-->'
     end
     local res = {}
     if node['@'] then
-        for _, k in ipairs(node['@']) do tinsert(res, k..'="'..strgsub(node['@'][k], '"', '\\"')..'"') end
+        for _, k in ipairs(node['@']) do
+            tinsert(res, k..'="'..strgsub(node['@'][k], '"', '\\"')..'"')
+        end
     end
     res = '<'..node['.']..(#res > 0 and ' '..tconcat(res, ' ') or '')
     if #node == 0 then return res..' />' end
     res = {res..'>'}
-    for i = 1, #node do tinsert(res, type(node[i]) == 'table' and wXml(node[i]) or xmlstr(node[i])) end
+    for i = 1, #node do
+        tinsert(res, type(node[i]) == 'table' and wXml(node[i]) or xmlstr(node[i]))
+    end
     if #res == 2 and #(res[2]) < 100 and not strfind(res[2], '\n') then
         return res[1]..res[2]..'</'..node['.']..'>'
     end
@@ -259,13 +258,9 @@ local dom = class { -- lua document object model {{{
     ['<'] = function (o, spec, mode, singleton) --{{{
 
         mode = tonumber(mode) or 7
-        singleton = tostring(singleton) or
-            'area base br col command embed hr img input keygen link meta param source track wbr'
-        if singleton then
-            local res = {}
-            for st in strgmatch(singleton, '%S+') do res[st] = true end
-            singleton = res
-        end
+        singleton = tostring(singleton) or lom.singleton
+        local singleArray = {}
+        for st in strgmatch(singleton, '%S+') do singleArray[st] = true end
 
         if type(spec) == 'table' then -- partial table-tree (0: data/stamp)
             for k, v in pairs(spec) do
@@ -283,7 +278,7 @@ local dom = class { -- lua document object model {{{
                 Closing = closing,
                 mode = mode,
                 ext = '<?php ?> <%= %>', -- weird stuff
-                singleton = singleton,
+                singleton = singleArray,
                 stack = {o} -- {{}}
             }
 
