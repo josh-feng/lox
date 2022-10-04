@@ -269,12 +269,12 @@ local dom = class { -- lua document object model {{{
         elseif type(spec) == 'string' then -- '' for text
 
             local p = lom.mp.new {
-                Scheme = scheme,
+                Scheme = (mode & 0x10 > 0) and scheme or nil,
                 StartElement = starttag,
                 EndElement = endtag,
                 CharacterData = mode > 7 and text or cleantext,
-                Comment = comment,
-                Extension = extension,
+                Comment = (mode & 0x20 > 0) and comment or nil,
+                Extension = (mode & 0x40 > 0) and extension or nil,
                 Closing = closing,
                 mode = mode,
                 ext = '<?php ?> <%= %>', -- weird stuff
