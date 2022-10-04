@@ -257,7 +257,7 @@ local dom = class { -- lua document object model {{{
 
     ['<'] = function (o, spec, mode, singleton) --{{{
 
-        mode = tonumber(mode) or 7
+        mode = tonumber(mode) or 0x0f
         singleton = tostring(singleton) or lom.singleton
         local singleArray = {}
         for st in strgmatch(singleton, '%S+') do singleArray[st] = true end
@@ -272,7 +272,7 @@ local dom = class { -- lua document object model {{{
                 Scheme = (mode & 0x10 > 0) and scheme or nil,
                 StartElement = starttag,
                 EndElement = endtag,
-                CharacterData = mode > 7 and text or cleantext,
+                CharacterData = (mode & 0x08 > 0) and cleantext or text,
                 Comment = (mode & 0x20 > 0) and comment or nil,
                 Extension = (mode & 0x40 > 0) and extension or nil,
                 Closing = closing,
@@ -468,7 +468,7 @@ end
 -- ================================================================== --
 -- service for checking object model and demo/debug -- {{{
 if arg and #arg > 0 and strfind(arg[0] or '', 'lom.lua$') then
-    local doc = lom(arg[1] == '-' and '' or arg[1])
+    local doc = lom(arg[1] == '-' and '' or arg[1], 0xff)
     if arg[1] == '-' then doc:parse(io.stdin:read('a')):parse() end
     -- lom(true)
     print(doc['?'] and tconcat(doc['?'], '\n') or doc:drop())
