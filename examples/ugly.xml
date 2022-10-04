@@ -16,6 +16,7 @@
 
 <!DOCTYPE catalog PUBLIC "http://www.oasis-open.org/committees/entity/release/1.0/catalog.dtd">
 
+<col abc="" />
 <catalog xmlns="urn:oasis:names:tc:entity:xmlns:xml:catalog">
   <public publicId="-//W3C//DTD SVG 20010904//EN" uri="svg10.dtd"/>
   some text

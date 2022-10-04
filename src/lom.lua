@@ -43,8 +43,10 @@ local function scheme (p, name, attr) -- {{{ definition/declaration
     -- tinsert(stack[#stack]['+'], {name, (strgsub(strgsub(tconcat(attr, ' '), '< ', '<'), ' >', '>'))})
 end -- }}}
 local function starttag (p, name, attr) -- {{{
-    local stack = p:getcallbacks().stack
-    tinsert((stack.singleton and stack.singleton[name]) and stack[#stack] or stack,
+    local stack = p:getcallbacks()
+    local singleton = stack.singleton
+    stack = stack.stack
+    tinsert((singleton and singleton[name]) and stack[#stack] or stack,
         {['.'] = name, ['@'] = #attr > 0 and lsmp2lomAttr(attr) or nil})
 end -- }}}
 local function endtag (p, name) -- {{{
@@ -258,7 +260,7 @@ local dom = class { -- lua document object model {{{
     ['<'] = function (o, spec, mode, singleton) --{{{
 
         mode = tonumber(mode) or 0x0f
-        singleton = tostring(singleton) or lom.singleton
+        singleton = tostring(singleton or lom.singleton)
         local singleArray = {}
         for st in strgmatch(singleton, '%S+') do singleArray[st] = true end
 
