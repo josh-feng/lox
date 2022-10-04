@@ -1,11 +1,14 @@
 # lox (lua object model for x/html)
 
-X/HTML is wacky and verbose. To parse an xml file to a lua table
+X/HTML is wacky and verbose. To parse an x/html file to a lua table
 and be able to recover it back to the orignal xml, it needs some design.
 Our design is pretty much the same as the document object model
 in luaExpat's `lxp.lom`; however, we use OOP to add structures
-and functionalities on our dom, and we implement a simple markup language parser
-for the expat replacement.
+and functionalities on our dom, and we implement a simple/sloppy markup language parser for an expat replacement.
+
+More info can be found in the [wiki page](https://github.com/josh-feng/lox/wiki/LOX-(Lua-Object-model-for-X-html))
+
+Example:
 
 ```html
 <tag>
@@ -208,7 +211,9 @@ xpath examples:
 
 unit|example|description
 ------|-----|------
-\#|\[id="x",3,proc="reader"\]|the 3rd element
+\#|\[id="x",**3**,proc="reader"\]|the 3rd element
+
+
 
 ### Examples
 
