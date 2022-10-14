@@ -1,15 +1,19 @@
 # lox (lua object model for x/html)
 
+
 X/HTML is wacky and verbose. To parse an x/html file to a lua table
-and be able to recover it back to the orignal xml, it needs some design.
-Our design is pretty much the same as the document object model
-in luaExpat's `lxp.lom`; however, we use OOP to add structures
-and functionalities on our dom, and we implement a simple/sloppy markup language parser for an expat replacement.
+and be able to recover it back to the orignal x/html, it needs some design.
+Our design uses pretty much the same as the document object model
+in luaExpat's `lxp.lom`; however, we use OOP to add some structures
+and functionalities on our dom, and we also implement
+a simple/sloppy markup language parser for an expat replacement.
 
-More info can be found in the [wiki page](https://github.com/josh-feng/lox/wiki/LOX-(Lua-Object-model-for-X-html))
+More info will be added to the [wiki page](https://github.com/josh-feng/lox/wiki/LOX-(Lua-Object-model-for-X-html))
 
-Example:
 
+A quick example:
+
+For the following file `example.xml`
 ```html
 <tag>
     <b b='1' c='2' />
@@ -24,6 +28,8 @@ Example:
 ```
 
 lox will convert it as a lua table (doc):
+
+> ] ./lom.lua example.xml
 
 ```lua
 { ['.'] = 'tag',
@@ -40,37 +46,35 @@ lox will convert it as a lua table (doc):
 
 **NB:** the comment text will be prefixed with `\0` character.
 
-It's useful for servers supporting lua, such as nginx/openresty (or apache + lua module)
+It's useful for servers supporting lua, such as nginx/openresty (or apache + lua module).
 
-For client side, javascript is supported by most browsers, there are some
-new browsers supporting lua internally, such as `luakit`.
-We will see if running lua inside a browser (console) is possible.
-
-## Requirements
+## Requirements and Install
 
 
-- lua >= 5.1
+- lua >= 5.3
 - pool: <https://github.com/josh-feng/pool>
 - ~~luaExpat: <http://www.keplerproject.org/luaexpat> or <https://github.com/LuaDist/luaexpat>~~
 - ~~posix <https://github.com/luaposix/luaposix/> (required by `us.lua`)~~
 
+To install, run `makefile`, and copy files to lua's folders. Or check
 
-## lom
+- <https://luarocks.org/modules/josh-feng/lox>
 
+# lom
 
 Module `lom.lua` uses `pool.lua` and `us.lua` to create 'doc' objects
 
 ```lua
 lom = require('lom')
 
-doc1 = lom('/path/to/file.xml')   -- doc object
+doc1 = lom('/path/to/file.html') -- doc object
 
-doc2 = lom('')
+doc2 = lom('')                   -- text/data are supplied to parser
 doc2:parse(xmltxt_1)
 -- ...
 doc2:parse(xmltxt_n):parse()
 
-doc3 = lom(doc2)
+doc3 = lom(doc2)                 -- dom from a table
 
 lom(true) -- buildxlink
 ```
@@ -91,14 +95,16 @@ There are 3 ways to create document objects with different initial arguments
 
     the doc is a **dom** class instance, initialized with the supplied table.
 
+Internally dom is a `pool` class with the following structure:
+
 ```lua
-class {
+dom = class {
     ['.'] = false; -- tag name
     ['@'] = false; -- attr
     ['&'] = false; -- xlink table
     ['?'] = false; -- errors
     ['*'] = false; -- module
-    ['+'] = false; -- extension
+    ['+'] = false; -- schema / declaration
 }
 ```
 
@@ -108,10 +114,9 @@ Calling `lom` with everything else will trigger the **buildxlink** procedure, wh
 lom(true)
 ```
 
-
 ### Non-ending tags
 
-singleton are
+Html singletons are
 `area`, `base`, `br`, `col`, `command`, `embed`, `hr`, `img`, `input`, `keygen`, `link`,
 `meta`, `param`, `source`, `track`, `wbr`.
 
@@ -121,14 +126,11 @@ HTML attributes with no values will confuse the luaexpat.
 
 `allowfullscreen`, `async`, `autofocus`, `autoplay`, `checked`, `controls`, `default`, `defer`, `disabled`, `formnovalidate`, `ismap`, `itemscope`, `loop`, `multiple`, `muted`, `nomodule`, `novalidate`, `open`, `playsinline`, `readonly`, `required`, `reversed`, `selected`, `truespeed`
 
-
 ### Escaped characters (in javascript)
 
 `<` and `>`
 
 ## buildxlink / xpath / api
-
-
 
 Some standards for xpath
 - <https://developer.mozilla.org/en-US/docs/Web/XPath>
@@ -160,7 +162,6 @@ xpath and xlinks can be shown in following cross-linked xml files
     <d xlink:href="a.xml#xpointer(/a/b/)" />
 </b>
 ```
-
 
 The `lom` will parse these 2 files and then build the xlink:
 
@@ -278,8 +279,6 @@ print(docb:drop())
 
 ## XmlObject
 
-
-
 Attribute `proc` invoke module/class instantiation.
 
     <tag proc='module1'> ... </tag>
@@ -297,22 +296,25 @@ lom(true) -- build the links
 x = XmlObject(doc)
 ```
 
-# LSMP
+# lsmp
 
-Lua Simple/Sloppy Markup Parser
+Lua Simple/Sloppy Markup Parser (lsmp) is a quick and dirty replacement
+for expat.
+It's a SAX parser, so uses some callback functions.
+Please read `lom.lua` to understand its usage.
 
 XML expat coding reference:
 
 - <https://strophe.im/libstrophe/doc/0.10.0/expat_8h.html>
+
+## build with makefile
+
+Please modify `makefile` based on your system.
 
 
 # Note
 
 TODO
 
-- us.lua
 - XmlObject
-- makefile
-- xml, html examples
-- README
 - error handling
