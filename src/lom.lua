@@ -123,7 +123,7 @@ local function xPath (c, paths, doc, conti) -- {{{ return doc/xml-node table, en
     end
 
     local xn = {} -- xml-node (doc)
-    local docl = doc['&']
+    local docl = (not paths.invidual) and doc['&'] -- follow xpointer or not
     local docn = docl and 0
     repeat
         for i = 1, #doc do
@@ -131,6 +131,7 @@ local function xPath (c, paths, doc, conti) -- {{{ return doc/xml-node table, en
             if type(mt) == 'table' then
                 if mt['.'] == tag and (autopass or we.match(mt['@'], path)) then
                     tinsert(xn, mt)
+                    if c == paths.remove then doc[i] = '\0'..'nil' end -- set as a comment
                 elseif strsub(paths[1], 1, 1) ~= '/' then -- start from anywhere?
                     conti = conti or {} -- reset to 1 to continue
                     if c == 1 then
@@ -331,7 +332,16 @@ local dom = class { -- lua document object model {{{
 
     -- member functions supporting cascade oo style
     select = function (o, path)
-        return class:new(o, o:xpath(path))
+        path = procXpath(path)
+        path.invidual = true
+        return class:new(o, (xPath(1, path, o)))
+    end;
+
+    remove = function (o, path)
+        path = procXpath(path)
+        path.invidual = true
+        path.remove = #path >> 1
+        return o, xPath(1, path, o) -- if the removed is needed
     end;
 } -- }}}
 
