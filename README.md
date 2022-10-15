@@ -108,6 +108,17 @@ dom = class {
 }
 ```
 
+with some member functions
+
+function | description
+---------|-------------
+parse | parse the text
+xpath | return a table
+drop  | output as a string
+select | return the nodes
+remove | remove nodes
+
+
 Calling `lom` with everything else will trigger the **buildxlink** procedure, which will build the xpointer links:
 
 ```lua
