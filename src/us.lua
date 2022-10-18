@@ -274,7 +274,7 @@ local function var2str (value, key, fmt) -- {{{ emit variables in lua
 
     if type(value) == 'number' then return assign..value end
     if type(value) == 'string' then return assign..'"'..strgsub(value, '"', '\\"')..'"' end
-    if type(value) ~= 'table' then return '' end
+    if type(value) ~= 'table' then return assign..tostring(value) end
 
     -- increase the depth
     tinsert(fmt, type(key) == 'number' and '['..key..']' or key or '')
