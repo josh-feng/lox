@@ -27,11 +27,38 @@ local lom = { -- {{{
 local docs = lom.doc -- xml object list (hidden upvalue)
 
 local function lsmp2lomAttr (attr) -- {{{ parse lsmp attr table to lom attr table
+    local k, v
     for i = 1, #attr do
-        local key, val = strmatch(attr[i], "^([^=]*)=?(.*)$")
-        attr[key] = we.trimq(val) or false
+        local key, eq, val = strmatch(attr[i], "^([^=]*)(=?)(.*)$")
+        if eq == '' then -- key
+            if v then
+                attr[k] = we.trimq(key)
+                k = false
+            else
+                if k then attr[k] = true end
+                k = key
+            end
+            v = false
+        elseif key == '' and val == '' then -- =
+            v = k and true
+        elseif key == '' then -- =val
+            if k then attr[k] = we.trimq(val) ; k = false
+            else k = we.trimq(val) end
+            v = false
+        else
+            if k then attr[k] = v and '' or true end
+            if val ~= '' then -- key=val
+                attr[key] = we.trimq(val)
+                k = false
+                v = false
+            else -- key=
+                k = key
+                v = true
+            end
+        end
         attr[i] = nil -- clean
     end
+    if k then attr[k] = v and '' or true end
     return attr
 end -- }}}
 
@@ -234,8 +261,9 @@ local function wXml (node) -- {{{
     end
     local res = {}
     if node['@'] then
-        for _, k in ipairs(node['@']) do
-            tinsert(res, k..'="'..strgsub(node['@'][k], '"', '\\"')..'"')
+        for k, v in pairs(node['@']) do
+            tinsert(res, k..((type(v) == 'string')
+            and '="'..strgsub(v, '"', '\\"')..'"' or ''))
         end
     end
     res = '<'..node['.']..(#res > 0 and ' '..tconcat(res, ' ') or '')
