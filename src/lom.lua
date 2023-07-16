@@ -4,10 +4,10 @@
 -- DOM: doc = {['.'] = tag; ['@'] = {}; ['&'] = {{}..}; '\0comment', ...}
 -- Usage example:
 --      lom = require('lom')
---      doc = lom(xmlfile or '')
---      doc = lom('') doc:parse(txt):parse()
+--      doc1 = lom(xmlfilepath)
+--      doc2 = lom('') ; doc2:parse(txt):parse()
 --      lom(true) -- buildxlink
---      xmltxt = doc:drop(1)
+--      xmltxt = doc2:drop(1)
 -- ================================================================== --
 local class = require('pool') -- https://github.com/josh-feng/pool.git
 local we = require('us') -- working environment
@@ -18,11 +18,17 @@ local strrep, strgsub, strfind = string.rep, string.gsub, string.find
 local tinsert, tremove, tconcat = table.insert, table.remove, table.concat
 local mmin = math.min
 -- ================================================================== --
+local singleton
 local lom = { -- {{{
     doc = {}; -- doctree for files, user's management
     mp = require('lsmp'), -- a simple/sloppy SAX to replace lxp
-    singleton = 'area base br col command embed hr img input keygen link meta param source track wbr'
+    singleton = function (str)
+        singleton = {} -- reset
+        for k in strgmatch(str, '%S+') do singleton[k] = true end
+    end
 }
+
+lom.singleton('area base br col command embed hr img input keygen link meta param source track wbr')
 
 local docs = lom.doc -- xml object list (hidden upvalue)
 
@@ -67,13 +73,10 @@ local function scheme (p, name, attr) -- {{{ definition/declaration
     stack[#stack]['+'] = stack[#stack]['+'] or {}
     attr[0] = name
     tinsert(stack[#stack]['+'], attr)
-    -- tinsert(stack[#stack]['+'], {name, (strgsub(strgsub(tconcat(attr, ' '), '< ', '<'), ' >', '>'))})
 end -- }}}
 local function starttag (p, name, attr) -- {{{
-    local stack = p:getcallbacks()
-    local singleton = stack.singleton
-    stack = stack.stack
-    tinsert((singleton and singleton[name]) and stack[#stack] or stack,
+    local stack = p:getcallbacks().stack
+    tinsert(singleton[name] and stack[#stack] or stack,
         {['.'] = name, ['@'] = #attr > 0 and lsmp2lomAttr(attr) or nil})
 end -- }}}
 local function endtag (p, name) -- {{{
@@ -286,12 +289,9 @@ local dom = class { -- lua document object model {{{
     ['*'] = false; -- module
     ['+'] = false; -- misc info (definition/declaration)
 
-    ['<'] = function (o, spec, mode, singleton) --{{{
+    ['<'] = function (o, spec, mode) --{{{
 
         mode = tonumber(mode) or 0x0f
-        singleton = tostring(singleton or lom.singleton)
-        local singleArray = {}
-        for st in strgmatch(singleton, '%S+') do singleArray[st] = true end
 
         if type(spec) == 'table' then -- partial table-tree (0: data/stamp)
             for k, v in pairs(spec) do
@@ -309,7 +309,6 @@ local dom = class { -- lua document object model {{{
                 Closing = closing,
                 mode = mode,
                 ext = '<?php ?> <%= %>', -- weird stuff
-                singleton = singleArray,
                 stack = {o} -- {{}}
             }
 
@@ -435,7 +434,7 @@ setmetatable(lom, {
             spec = we.normpath(spec)
             if docs[spec] then return docs[spec] end
         elseif spec and type(spec) ~= 'table' then -- closing
-            return buildxlink() -- TODO error message
+            return buildxlink() -- error message table
         end
         return dom(spec, mode)
     end; -- }}}
@@ -515,4 +514,4 @@ if arg and #arg > 0 and strfind(arg[0] or '', 'lom.lua$') then
 end -- }}}
 
 return lom
--- vim:ts=4:sw=4:sts=4:et:fen:fdm=marker:fmr={{{,}}}:fdl=1
+-- vim:ts=4:sw=4:sts=4:et:fdm=marker:fdl=1:sbr=-->
