@@ -18,9 +18,10 @@ local strrep, strgsub, strfind = string.rep, string.gsub, string.find
 local tinsert, tremove, tconcat = table.insert, table.remove, table.concat
 local mmin = math.min
 -- ================================================================== --
+local docs = {}; -- doctree for files, user's management
 local singleton
 local lom = { -- {{{
-    doc = {}; -- doctree for files, user's management
+    doc = docs,
     mp = require('lsmp'), -- a simple/sloppy SAX to replace lxp
     singleton = function (str)
         singleton = {} -- reset
@@ -29,8 +30,6 @@ local lom = { -- {{{
 }
 
 lom.singleton('area base br col command embed hr img input keygen link meta param source track wbr')
-
-local docs = lom.doc -- xml object list (hidden upvalue)
 
 local function lsmp2lomAttr (attr) -- {{{ parse lsmp attr table to lom attr table
     local k, v
@@ -428,13 +427,15 @@ end; -- }}}
 
 setmetatable(lom, {
     __metatable = true;
-    __tostring = function (c) return we.tbl2str(lom.doc, '\n') end;
+    __tostring = function (c) return we.tbl2str(docs, '\n') end;
     __call = function (c, spec, mode) -- {{{ dom object creator
         if type(spec) == 'string' then -- '' for incremental text
             spec = we.normpath(spec)
             if docs[spec] then return docs[spec] end
         elseif spec and type(spec) ~= 'table' then -- closing
             return buildxlink() -- error message table
+        elseif spec == nil then
+            lom.doc = docs -- reset
         end
         return dom(spec, mode)
     end; -- }}}
