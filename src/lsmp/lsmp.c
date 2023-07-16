@@ -382,7 +382,7 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
               break;
             }
             else if (((p->mode & S_STATES) == S_COMMENT) &&
-                (0 == strncmp(c - 2, "-->", 3)) && c > s + 7 ) {
+                (0 == strncmp(c - 2, "-->", 3)) && c >= s + 2 ) {
               *(c - 2) = '\0';
               p->fc(p->ud, s, c - 2 - s); /* comment */
               break;
@@ -692,4 +692,4 @@ LUA_API int luaopen_lsmp (lua_State *L) {
   lua_setfield(L, -2, "lic");
   return 1;
 } /* }}} */
-// vim:ts=4:sw=4:sts=4:et:fen:fdm=marker:fmr={{{,}}}:fdl=1
+// vim:ts=2:sw=2:sts=2:et:fdm=marker:fdl=1
