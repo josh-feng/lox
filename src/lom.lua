@@ -79,6 +79,7 @@ local function starttag (p, name, attr) -- {{{
         {['.'] = name, ['@'] = #attr > 0 and lsmp2lomAttr(attr) or nil})
 end -- }}}
 local function endtag (p, name) -- {{{
+    if singleton[name] then return end
     local stack = p:getcallbacks().stack
     if #stack > 1 then -- {o}
         local element = tremove(stack)
@@ -291,6 +292,13 @@ local dom = class { -- lua document object model {{{
     ['<'] = function (o, spec, mode) --{{{
 
         mode = tonumber(mode) or 0x0f
+        -- 0x40 extension: <?php ?> <%= %>
+        -- 0x20 keep comment
+        -- 0x10 scheme
+        -- 0x08 trim text (default)
+        -- 0x04 mp: TODO (default)
+        -- 0x02 mp: sloppy <_ _> (default)
+        -- 0x01 mp: escape \' \" \< \> (default)
 
         if type(spec) == 'table' then -- partial table-tree (0: data/stamp)
             for k, v in pairs(spec) do

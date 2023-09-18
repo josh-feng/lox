@@ -46,6 +46,7 @@ lox will convert it as a lua table (doc):
 }
 ```
 
+
 - `['.']` entry assigns the tag name.
 - Subnodes and elements are placed consecutively in the table.
 - The comment text will be prefixed with `\0` character.
@@ -119,8 +120,8 @@ The `lom` will parse these 2 files and then build the xlink:
 
 ```lua
 lom = require('lom')
-doca = lom('a.xml', 0x0f)
-docb = lom('b.xml', 0x0f)
+doca = lom('a.xml', 0x0f)   -- default mode: skip comments
+docb = lom('b.xml', 0x0f)   -- default mode: skip comments
 
 lom(true)
 
@@ -184,6 +185,8 @@ Lox's dom sometimes has a tag link entry, which is a table and contains entry `[
     <d xlink:href="a.xml#xpointer(/a/b/)" />
 </b>
 ```
+
+The `select` method is demonstrated in the following various cases:
 
 ```lua
 lom = require('lom')
