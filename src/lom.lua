@@ -12,26 +12,17 @@
 local class = require('pool') -- https://github.com/josh-feng/pool.git
 local we = require('us') -- working environment
 
-local next, assert, type = next, assert, type
-local strlen, strsub, strmatch, strgmatch = string.len, string.sub, string.match, string.gmatch
-local strrep, strgsub, strfind = string.rep, string.gsub, string.find
+local type = type
+local strlen, strmatch, strgmatch = string.len, string.match, string.gmatch
+local strsub, strgsub, strfind = string.sub, string.gsub, string.find
 local tinsert, tremove, tconcat = table.insert, table.remove, table.concat
 local mmin = math.min
 -- ================================================================== --
-local docs = {}; -- doctree for files, user's management
-local singleton
-local lom = { -- {{{
-    doc = docs,
-    mp = require('lsmp'), -- a simple/sloppy SAX to replace lxp
-    singleton = function (str)
-        singleton = {} -- reset
-        for k in strgmatch(str, '%S+') do singleton[k] = true end
-    end
-}
+local docs = {} -- {{{ doctree for files, user's management
+local singleton = {}
+local mp = require('lsmp') -- a simple/sloppy SAX to replace lxp
 
-lom.singleton('area base br col command embed hr img input keygen link meta param source track wbr')
-
-local function lsmp2lomAttr (attr) -- {{{ parse lsmp attr table to lom attr table
+local function lsmp2domAttr (attr) -- {{{ parse lsmp attr table to dom attr table
     local k, v
     for i = 1, #attr do
         local key, eq, val = strmatch(attr[i], "^([^=]*)(=?)(.*)$")
@@ -76,7 +67,7 @@ end -- }}}
 local function starttag (p, name, attr) -- {{{
     local stack = p:getcallbacks().stack
     tinsert(singleton[name] and stack[#stack] or stack,
-        {['.'] = name, ['@'] = #attr > 0 and lsmp2lomAttr(attr) or nil})
+        {['.'] = name, ['@'] = #attr > 0 and lsmp2domAttr(attr) or nil})
 end -- }}}
 local function endtag (p, name) -- {{{
     if singleton[name] then return end
@@ -116,7 +107,8 @@ end -- }}}
 
 local function parse (o, txt) -- friend function {{{
     local p = o[0]
-    local status, msg, line, col, pos = p:parse(txt) -- pass nil if failed
+    -- local status, msg, line, col, pos = p:parse(txt) -- pass nil if failed
+    local status, msg, line = p:parse(txt) -- pass nil if failed
     if not (txt and status) then
         if not status then o['?'] = {msg..' #'..line} end
         p:close() -- mp obj is destroyed
@@ -154,7 +146,7 @@ local function xPath (c, paths, doc, conti) -- {{{ return doc/xml-node table, en
 
     local xn = {} -- xml-node (doc)
     local docl = (not paths.invidual) and doc['&'] -- follow xpointer or not
-    local docn = docl and 0
+    local docn = 0
     repeat
         for i = 1, #doc do
             local mt = doc[i]
@@ -172,8 +164,8 @@ local function xPath (c, paths, doc, conti) -- {{{ return doc/xml-node table, en
                 end
             end
         end
-        if docn then docn = docn < #docl and docn + 1 end
-        doc = docn and docl[docn]
+        docn = docn + 1
+        doc = docl and docl[docn]
     until not doc
 
     if path and #path > 0 and #xn > 0 then -- collect the indixed table
@@ -245,8 +237,9 @@ local function xmlstr (s, fenc) -- {{{ enc: gzip -c | base64 -w 128 / dec: base6
     s = tostring(s)
     if strfind(s, '\n') or (strlen(s) > 1024) then -- large text
         if fenc or strfind(s, ']]>') then -- enc flag or hostile strings
-            local status, stdout, stderr = we.popen(s, 'gzip -c | base64 -w 128')
-            return '<!-- base64 -i -d | zcat -f -->{{{'..stdout..'}}}'
+            -- local status, stdout, stderr = we.popen(s, 'gzip -c | base64 -w 128')
+            local status, stdout = we.popen(s, 'gzip -c | base64 -w 128')
+            return status and '<!-- base64 -i -d | zcat -f -->{{{'..stdout..'}}}' or ''
         else
             return (strfind(s, '&') or strfind(s, '<') or strfind(s, '>'))
                 and '<![CDATA[\n'..s..']]>' or s
@@ -306,7 +299,7 @@ local dom = class { -- lua document object model {{{
             end
         elseif type(spec) == 'string' then -- '' for text
 
-            local p = lom.mp.new {
+            local p = mp.new {
                 Scheme = (mode & 0x10 > 0) and scheme or nil,
                 StartElement = starttag,
                 EndElement = endtag,
@@ -323,22 +316,20 @@ local dom = class { -- lua document object model {{{
                 o[0] = p
                 o.parse = parse
             else
-                local file, msg = io.open(spec, 'r')
+                local file, msg, status, line
+                file, msg = io.open(spec, 'r')
                 if file then -- clean up xml/html mess
                     msg = file:read('*all')
                     file:close()
-                    local status, msg, line, col, pos = p:parse(msg)
+                    -- local status, msg, line, col, pos = p:parse(msg)
+                    status, msg, line = p:parse(msg)
                     if status then status, msg, line = p:parse() end
                     if not status then o['?'] = {msg..' #'..line} else p:close() end
                 else
                     o['?'] = {msg}
                 end
             end
-        end
-        if type(spec) == 'string' and spec ~= '' then
-            docs[spec] = o
-        else
-            tinsert(docs, o)
+            if spec == '' then tinsert(docs, o) else docs[spec] = o end
         end
     end; --}}}
 
@@ -355,11 +346,11 @@ local dom = class { -- lua document object model {{{
         if not fxml then return we.var2str(o) end
         local res = {fxml == 1 and '<?xml version="1.0" encoding="UTF-8"?>' or nil}
         local docl = o['&']
-        local docn = docl and 0
+        local docn = 0
         repeat
             for j = 1, #o do tinsert(res, wXml(o[j])) end
-            if docn then docn = docn < #docl and docn + 1 end
-            o = docn and docl[docn]
+            docn = docn + 1
+            o = docl and docl[docn]
         until not o
         return tconcat(res, '\n')
     end;-- }}}
@@ -374,10 +365,12 @@ local dom = class { -- lua document object model {{{
     remove = function (o, path)
         path = procXpath(path)
         path.invidual = true
-        path.remove = #path >> 1
+        -- path.remove = #path >> 1
+        path.remove = math.floor(#path / 2)
         return o, xPath(1, path, o) -- if the removed is needed
     end;
 } -- }}}
+-- }}}
 
 local buildxlink = function () -- xlink -- xlink/xpointer based on root {{{
     for _, xml in ipairs(docs) do if xml.parse then xml:parse() end end
@@ -433,22 +426,28 @@ local buildxlink = function () -- xlink -- xlink/xpointer based on root {{{
     for xml, o in pairs(docs) do if not o['?'] then traceTbl(o, xml) end end
 end; -- }}}
 
-setmetatable(lom, {
+local lom = setmetatable({}, {
     __metatable = true;
-    __tostring = function (c) return we.tbl2str(docs, '\n') end;
+    __tostring = function () return we.tbl2str(docs, '\n') end;
     __call = function (c, spec, mode) -- {{{ dom object creator
         if type(spec) == 'string' then -- '' for incremental text
             spec = we.normpath(spec)
-            if docs[spec] then return docs[spec] end
-        elseif spec and type(spec) ~= 'table' then -- closing
+            if c.doc[spec] then return c.doc[spec] end
+        elseif type(spec) ~= 'table' then -- closing
             return buildxlink() -- error message table
-        elseif spec == nil then
-            lom.doc = docs -- reset
         end
         return dom(spec, mode)
     end; -- }}}
+    __index = {
+        doc = docs;
+        singleton = function (str)
+            for k in pairs(singleton) do singleton[k] = nil end -- reset
+            for k in strgmatch(str, '%S+') do singleton[k] = true end
+        end;
+    }
 })
--- }}}
+
+lom.singleton('area base br col command embed hr img input keygen link meta param source track wbr')
 -- ================================================================== --
 lom.api = class[dom].__index; -- dom's member function extension
 
@@ -500,18 +499,6 @@ lom.api.arrange = function (o, ele, i) -- {{{ also remove/append TODO
     end
     return o
 end -- }}}
-
-lom.api.filter = function (o, val) -- TODO adjust
-    return o
-end
-
-lom.api.enter = function (o) -- TODO
-    return o
-end
-
-lom.api.exit = function (o) -- TODO
-    return o
-end
 
 -- ================================================================== --
 -- service for checking object model and demo/debug -- {{{
