@@ -1,7 +1,7 @@
 /* lua simple/sloppy markup(x/html) parser
 ** Josh Feng (C) MIT license 2022
 ** The first part is solely an SML parser in C.
-** The second part is a lua module, as a coding example of the first part
+** The second part is a lua module, as a coding example using the first part
 */
 #include <stdio.h>
 #include <assert.h>
@@ -9,8 +9,6 @@
 #include <string.h>
 
 #include "lsmp.h"
-
-// #define DEBUG 3
 
 #ifdef DEBUG
 #define DBG(l,x);  if (DEBUG >= l) {x}

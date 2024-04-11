@@ -91,4 +91,4 @@ void          SML_ParserFree   (SML_Parser p);
 
 extern const char *SML_ErrorString[];
 #endif
-/*vim:ts=4:sw=4:sts=4:et:fen:fdm=marker:fmr={{{,}}}:fdl=1:cms=*/
+/*vim:ts=4:sw=4:sts=4:et:fdm=marker:fdl=1:cms=*/
