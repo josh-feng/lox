@@ -8,8 +8,8 @@ we.stamp, we.posix = pcall(require, 'posix') -- return status and package
 
 local strgsub, strsub, strgmatch, strmatch, strfind =
     string.gsub, string.sub, string.gmatch, string.match, string.find
-local tinsert, tremove, tconcat, tsort =
-    table.insert, table.remove, table.concat, table.sort
+local tinsert, tremove, tconcat =
+    table.insert, table.remove, table.concat
 
 local Log
 
@@ -54,27 +54,28 @@ we.popen = function (datastr, cmd) -- {{{ status, out, err = we.popen(in, cmd)
     -- usage example: local status, out, err = we.popen(in, 'wc -c')
     local ri, wi = posix.pipe() -- for child stdin
     local ro, wo = posix.pipe() -- for child stdout
-    local re, we = posix.pipe() -- for child stderr
+    local re, wr = posix.pipe() -- for child stderr
     assert(wi or ro or re, 'pipe() failed')
-    local pid, err = posix.fork() -- child proc
+    local pid = posix.fork() -- child proc, ignore err return
     if pid == 0 then -- for child proc {{{
         posix.close(wi)
         posix.close(ro)
         posix.close(re)
         posix.dup2(ri, posix.fileno(io.stdin))
         posix.dup2(wo, posix.fileno(io.stdout))
-        posix.dup2(we, posix.fileno(io.stderr))
+        posix.dup2(wr, posix.fileno(io.stderr))
         -- local ret, err = posix.execp(path, argt or {}) -- w/ shell
-        local ret, err = posix.exec('/bin/sh', {'-c', cmd}) -- w/o shell
+        -- local ret, err = posix.exec('/bin/sh', {'-c', cmd}) -- w/o shell
+        posix.exec('/bin/sh', {'-c', cmd}) -- w/o shell
         posix.close(ri)
         posix.close(wo)
-        posix.close(we)
+        posix.close(wr)
         posix._exit(1)
     end -- }}}
     -- for parent proc
     posix.close(ri)
     posix.close(wo)
-    posix.close(we)
+    posix.close(wr)
 
     -- pid, wi, ro, re -- posix pid and posix's filedes
     -- send to stdin
@@ -108,16 +109,18 @@ we.ask = function (cmd, multi, err) -- {{{ Est-ce-que (Alor, on veut savoir le r
     if err and multi then cmd = string.gsub(cmd, ';', ' 2>&1;') end
     -- NB: lua use (POSIX) sh, we can use 2>&1 to redirect stderr to stdout
     local file = io.popen(cmd..(err and ' 2>&1' or ''), 'r')
-    local msg = file:read('*all')
-    file:close()
+    local msg = file and file:read('*all')
+    if file then file:close() end
     return msg
 end -- }}}
 
 we.put = function (str, cmd) -- {{{ put to stdin (str?)
     we.dbg(cmd)
     local file = io.popen(cmd, 'w')
-    local result = file:write(str)
-    file:close()
+    if file then
+        file:write(str) -- local result = file and file:write(str)
+        file:close()
+    end
 end -- }}}
 
 we.exist = function (path) -- {{{ isdir : we.exist(path..'/.')
@@ -145,7 +148,7 @@ end -- }}}
 -- =====================  STRING FUNCTIONS  ========================= --
 -- ================================================================== --
 we.split = function (str, sep) -- {{{ split string w/ ':' into a table
-    if type(str) ~= 'string' then return end
+    if type(str) ~= 'string' then error(str) end
     local t = {}
     for o in strgmatch(str, '[^'..(sep or ':')..']*') do tinsert(t, o) end
     return t
@@ -155,8 +158,8 @@ local pm = '().+-*?[^$' -- need to put % first
 we.strpm = function (str) -- pattern matching string {{{ -- escape: ().%+-*?[^$
     str = strgsub(str, '%%', '%%%%')
     for s = 1, #pm do
-        s = '%'..strsub(pm, s, s)
-        str = strgsub(str, s, '%'..s)
+        local st = '%'..strsub(pm, s, s)
+        str = strgsub(str, st, '%'..st)
     end
     return str
 end -- }}}
@@ -184,7 +187,7 @@ end -- }}}
 we.normpath = function (path, pwd) -- {{{ full, base, name
     if pwd and strsub(path, 1, 1) ~= '/' then path = pwd..'/'..path end
     local o = {}
-    for i, v in ipairs(we.split(strgsub(path, '/+/', '/'), '/')) do
+    for _, v in ipairs(we.split(strgsub(path, '/+/', '/'), '/')) do
         if v == '..' then
             if #o == 0 or o[#o] == '..' then tinsert(o, v) elseif o[#o] ~= '' then tremove(o) end
         elseif v ~= '.' then
@@ -279,7 +282,7 @@ local function var2str (value, key, fmt) -- {{{ emit variables in lua
     -- increase the depth
     tinsert(fmt, type(key) == 'number' and '['..key..']' or key or '')
 
-    local extdef, keyhead = ''
+    local extdef, keyhead = '', nil
     if fmt.ext then -- the depths to external {{{
         for _ = 1, #(fmt.ext) do
             if #fmt == fmt.ext[_] then
@@ -327,9 +330,9 @@ local function var2str (value, key, fmt) -- {{{ emit variables in lua
             res = {tconcat(res, ' ')} -- }}}
         else --
             tmp1 = false
-            res = tconcat(res, ',\n')
-            if string.len(res) < fmt.len then res = strgsub(res, '\n', ' ') end
-            res = {res}
+            local resstr = tconcat(res, ',\n')
+            if string.len(resstr) < fmt.len then resstr = strgsub(resstr, '\n', ' ') end
+            res = {resstr}
         end
     end -- }}}
     if #kset > 0 then -- {{{
@@ -346,16 +349,16 @@ local function var2str (value, key, fmt) -- {{{ emit variables in lua
             end -- }}}
         end
     end -- }}}
-    kset = #res
+    local nres = #res
     tremove(fmt)
-    res = tconcat(res, ',\n')
+    local resstr = tconcat(res, ',\n')
     if #fmt == 0 and #(fmt.def) > 0 then extdef = '\n'..tconcat(fmt.def, '\n') end
-    if not strfind(res, '\n') then return assign..'{'..res..'}'..extdef end
-    if (not tmp1) and string.len(res) < fmt.len and kset < fmt.num then
-        return assign..'{'..strgsub(res, '\n', ' ')..'}'..extdef
+    if not strfind(resstr, '\n') then return assign..'{'..resstr..'}'..extdef end
+    if (not tmp1) and string.len(resstr) < fmt.len and nres < fmt.num then
+        return assign..'{'..strgsub(resstr, '\n', ' ')..'}'..extdef
     end
     tmp1 = string.rep(' ', 4)
-    return assign..'{\n'..tmp1..strgsub(res, '\n', '\n'..tmp1)..'\n}'..extdef
+    return assign..'{\n'..tmp1..strgsub(resstr, '\n', '\n'..tmp1)..'\n}'..extdef
 end -- }}}
 
 we.var2str = function (value, key, ext) -- {{{
@@ -368,9 +371,9 @@ we.var2str = function (value, key, ext) -- {{{
         for k, v in pairs(ext) do
             if type(k) == 'string' and strmatch(k, '^L%d+$') and tonumber(v) and v > 1 then
                 fmt[k] = v
-                key = key or 'var_'..tostring(value) -- TODO
             end
         end
+        key = key or ('var_'..tostring(value))
         fmt.ext = ext -- control table
     end -- }}}
     return var2str(value, key, fmt)
@@ -404,4 +407,4 @@ we.traceTbl = function (tbl, testkey, procvalue, ...) -- {{{ table trace
     end
 end -- }}}
 return we
--- vim:ts=4:sw=4:sts=4:et:fen:fdm=marker:fmr={{{,}}}:fdl=1
+-- vim:ts=4:sw=4:sts=4:et:fdm=marker:fdl=1

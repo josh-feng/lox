@@ -33,7 +33,7 @@ local XmlObject = class { -- class module paradigm
         o.engine = engine
 
         local nodel = node['&']
-        local nodec = nodel and 0
+        local nodec = 0
         repeat
             for i = 1, #node do -- {{{
                 local subn = node[i]
@@ -50,8 +50,8 @@ local XmlObject = class { -- class module paradigm
                     end -- }}}
                 end
             end -- }}}
-            if nodec then nodec = nodec < #nodel and nodec + 1 end
-            node = nodec and nodel[nodec]
+            nodec = nodec + 1
+            node = nodel and nodel[nodec]
         until not node
 
         -- standard basic attributes/elements
@@ -70,7 +70,7 @@ local XmlObject = class { -- class module paradigm
     -- ===== tag handling functions: order kept, but keys destroyed ==== --
     XmlAttribute = function (o, attr, errmsg) -- {{{
         return o.node['@'] and o.node['@'][attr] or
-            (ermsg and error("Missing attribute("..o.node['.']..'@'..attr..") "..tostring(errmsg), 2))
+            (errmsg and error("Missing attribute("..o.node['.']..'@'..attr..") "..tostring(errmsg), 2))
     end; -- }}}
 
     XmlElement = function (o, elem, cls, errmsg) -- {{{ default class/object on element
@@ -106,7 +106,7 @@ local XmlObject = class { -- class module paradigm
         o.dtd = string.find(o.dtd, elem) and o.dtd or (elem..' '..o.dtd)
         tag = o.node:xpath(tag) -- tagtbl -- original (possible metatable)
         if #tag == 0 then
-            return errmsg and err('Missing ('..o.node['.']..'.'..elem..') '..tostring(errmsg), 2)
+            return errmsg and error('Missing ('..o.node['.']..'.'..elem..') '..tostring(errmsg), 2)
         end
         elem = {}
         for i = 1, #tag do
@@ -143,13 +143,13 @@ local XmlObject = class { -- class module paradigm
         if o.skip then return dbgmsg and o:Info(dbgmsg) end -- infra CODING debug message
         local node, engine, data = o.node, o.engine, o.engine.data
         local nodel = node['&']
-        local nodec = nodel and 0
+        local nodec = 0
         repeat
             for i = 1, #node do if type(node[i]) == 'table' then o:Run(node[i]) end end
-            if nodec then nodec = nodec < #nodel and nodec + 1 end
-            node = nodec and nodel[nodec]
+            nodec = nodec + 1
+            node = nodel and nodel[nodec]
         until not node
-        if o.debug then end -- BKM
+        if o.debug then print(engine, data) end -- BKM
     end; -- }}}
 
     Validate = function (o, elem) -- BKM: check the element formats/values {{{
@@ -168,4 +168,4 @@ then error('QA failed.', 1) end
 lom.doc[#(lom.doc)] = nil -- clean dummy doc from lom -- }}}
 
 return XmlObject
--- vim:ts=4:sw=4:sts=4:et:fen:fdm=marker:fmr={{{,}}}:fdl=1
+-- vim:ts=4:sw=4:sts=4:et:fdm=marker:fdl=1:sbr=-->
