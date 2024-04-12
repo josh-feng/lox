@@ -335,6 +335,10 @@ local dom = class { -- lua document object model {{{
 
     ['>'] = function (o) for i = 0, #o do o[i] = nil end end;
 
+    ['^'] = {
+        __call = function (o) return setmetatable(we.dup(o), getmetatable(o)) end;
+    };
+
     parse = false; -- implemented in friend function
 
     xpath = function (o, path, doc)

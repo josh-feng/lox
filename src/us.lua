@@ -281,6 +281,7 @@ local function var2str (value, key, fmt) -- {{{ emit variables in lua
 
     -- increase the depth
     tinsert(fmt, type(key) == 'number' and '['..key..']' or key or '')
+    -- if fmt.tbls[value] == nil then fmt.tbls[value] = #fmt end -- record TODO
 
     local extdef, keyhead = '', nil
     if fmt.ext then -- the depths to external {{{
@@ -381,30 +382,26 @@ end -- }}}
 -- ================================================================== --
 -- =====================  TABLES FUNCTIONS  ========================= --
 -- ================================================================== --
-we.cloneTbl = function (src) -- {{{ fully copy table
+we.dup = function (o, deep) -- duplicate {{{ deep = nil/false/other
+    if type(o) ~= 'table' then return o end
     local tbls = {}
-    local function cloneTbl (_src)
-        if tbls[_src] then return tbls end
-        local targ = {}
-        tbls[_src] = targ
-        for k, v in pairs(_src) do
-            targ[k] = type(v) == 'table' and cloneTbl(v) or v
+    local function cloneTbl (s, d)
+        if tbls[s] then return tbls[s] end
+        local t = {}
+        for k, v in pairs(s) do
+            t[k] = (d == nil or type(v) ~= 'table') and v or cloneTbl(v, d)
         end
-        local mt = getmetatable(_src)
-        if type(mt) == 'table' then setmetatable(targ, cloneTbl(mt)) end
-        return targ
-    end
-    return cloneTbl(src)
-end -- }}}
-
-we.traceTbl = function (tbl, testkey, procvalue, ...) -- {{{ table trace
-    for k, v in pairs(tbl) do
-        if testkey(k) then
-            procvalue(v, ...) -- record in ...
-        elseif type(v) == 'table' then -- trace the sub table
-            we.traceTbl(v, testkey, procvalue, ...)
+        tbls[s] = t
+        if d == nil then return t end
+        s = getmetatable(s)
+        if d and s and type(s.__index) == 'table' then
+            for k, v in pairs(s.__index) do
+                if t[k] == nil and type(v) == 'table' then t[k] = cloneTbl(v, d) end
+            end
         end
+        return setmetatable(t, s)
     end
+    return cloneTbl(o, deep)
 end -- }}}
 return we
 -- vim:ts=4:sw=4:sts=4:et:fdm=marker:fdl=1
