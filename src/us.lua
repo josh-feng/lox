@@ -268,10 +268,12 @@ we.check = function (v) -- {{{ -- check v is true or false
 end -- }}}
 -- ================================================================== --
 local function var2str (value, key, fmt) -- {{{ emit variables in lua
-    key = (type(key) == 'string' and strfind(key, '[^_%w]')) and '["'..key..'"]' or
-          (type(key) == 'boolean' and '['..tostring(key)..']' or key)
+    key = (type(key) == 'string' and strfind(key, '[^_%w]'))
+        and '["'..key..'"]'
+        or (type(key) == 'boolean' and '['..tostring(key)..']' or key)
 
-    local assign = ((key == nil) or fmt.idx) and "" -- TODO
+    local assign = ((key == nil) or fmt.idx)
+        and "" -- nmber 1..#
         or (type(key) == 'number' and '['..tostring(key)..']' or key)..' = '
     fmt.idx = false
 
@@ -281,7 +283,11 @@ local function var2str (value, key, fmt) -- {{{ emit variables in lua
 
     -- increase the depth
     tinsert(fmt, type(key) == 'number' and '['..key..']' or key or '')
-    -- if fmt.tbls[value] == nil then fmt.tbls[value] = #fmt end -- record TODO
+
+    if fmt.tbls[value] and key ~= fmt.tbls[value] then -- if self/table reference
+        tinsert(fmt.inc, strgsub(tconcat(fmt, "."), '%.%[', '[')..' = '..fmt.tbls[value])
+        return ''
+    end
 
     local extdef, keyhead = '', nil
     if fmt.ext then -- the depths to external {{{
@@ -365,8 +371,10 @@ end -- }}}
 we.var2str = function (value, key, ext) -- {{{
     -- e.g. print(we.var2str(a, 'a', {1, L4=3}))
     -- e.g. print(we.var2str(a, 'a', {1, ['a.b.1.3.5'] = 'ab', ['a.b.1.3.5'] = 13, }))
-    local fmt = {def = {}, len = 120, num = 12} -- external definitions m# = cloumn_num
+    local fmt = {def = {}, len = 120, num = 12, tbls = {}, inc = {}}
+    if type(key) == 'boolean' then fmt.safe = key end
     if type(ext) == 'table' then -- {{{
+        fmt.safe = fmt.safe or ext.safe
         fmt.len = ext.len or fmt.len -- max txt width
         fmt.num = ext.num or fmt.num -- max items in one line table
         for k, v in pairs(ext) do
@@ -374,17 +382,37 @@ we.var2str = function (value, key, ext) -- {{{
                 fmt[k] = v
             end
         end
-        key = key or ('var_'..tostring(value))
         fmt.ext = ext -- control table
     end -- }}}
-    return var2str(value, key, fmt)
+    local tot = {}
+    if type(value) == 'table' then
+        if key and type(key) ~= 'string' then key = strgsub(tostring(value), '%W*', '') end
+        if fmt.safe then
+            local function tblSurvey (s) -- {{{
+               if fmt.tbls[s] ~= nil then
+                   if fmt.tbls[s] == false then fmt.tbls[s] = strgsub(tostring(s), '%W', '') end
+               else
+                    fmt.tbls[s] = false
+                    for _, v in pairs(s) do if type(v) == 'table' then tblSurvey(v) end end
+               end
+            end --- }}}
+            tblSurvey(value)
+            for k, v in pairs(fmt.tbls) do
+                if type(k) ~= 'number' and v then tinsert(tot, var2str(k, v, fmt)) end
+            end
+        end
+    end
+    for _, v in ipairs(fmt.tbls) do tinsert(tot, v) end
+    if not fmt.tbls[value] then tinsert(tot, var2str(value, key, fmt)) end
+    for _, v in ipairs(fmt.inc) do tinsert(tot, v) end
+    return tconcat(tot, '\n')
 end -- }}}
 -- ================================================================== --
 -- =====================  TABLES FUNCTIONS  ========================= --
 -- ================================================================== --
 we.dup = function (o, deep) -- duplicate {{{ deep = nil/false/other
     if type(o) ~= 'table' then return o end
-    local tbls = {}
+    local tbls = {} -- records detecting self-reference
     local function cloneTbl (s, d)
         if tbls[s] then return tbls[s] end
         local t = {}
