@@ -232,6 +232,24 @@ Please read `lom.lua` to understand its usage.
 Please modify `makefile` based on your system.
 
 
+## us.lua
+
+Useful Stuff module can print out a table value.
+To make sure self-referenced table is well treated,
+we turn on the safe mode:
+
+```lua
+we = require('us') -- working environments
+
+a = {a = 1}
+print(we.var2str(a))
+{a = 1}
+
+a.b = a
+print(we.var2str(a, true)) -- safe mode
+table0x5590a12caeb0 = {a = 1}
+table0x5590a12caeb0.b = table0x5590a12caeb0
+```
 
 ## XmlObject.lua
 
