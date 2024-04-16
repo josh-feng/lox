@@ -397,6 +397,7 @@ we.var2str = function (value, key, ext) -- {{{
                end
             end --- }}}
             tblSurvey(value)
+            fmt.tbls[value] = key
             for k, v in pairs(fmt.tbls) do
                 if type(k) ~= 'number' and v then tinsert(tot, var2str(k, v, fmt)) end
             end
