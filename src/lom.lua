@@ -295,7 +295,7 @@ local dom = class { -- lua document object model {{{
 
         if type(spec) == 'table' then -- partial table-tree (0: data/stamp)
             for k, v in pairs(spec) do
-                if type(k) == 'number' or o[k] then o[k] = v end -- new data setting
+                if type(k) == 'number' or o[k] ~= nil then o[k] = v end -- new data setting
             end
         elseif type(spec) == 'string' then -- '' for text
 
