@@ -193,24 +193,35 @@ lom = require('lom')
 doca = lom('a.xml')
 docb = lom('b.xml')
 lom(true)
-print(doca:select('/a/b/'):drop())      --> {"we", "us"}
+print(doca:select('/a/b/'):drop())      --> {"we", "us", ["."] = "b"}
 print(doca:select('/a/b'):drop())       --> {{"we", ["."] = "b"}, {"us", ["."] = "b"}}
-print(doca:select('a/b/'):drop())       --> {"we", "us", "lom"}
+print(doca:select('a/b/'):drop())       --> {"we", "us", "lom", ["."] = "b"}
 print(doca:select('a/b'):drop())        --> {{"we", ["."] = "b"}, {"us", ["."] = "b"}, {"lom", ["."] = "b", ["@"] = {a1 = "r"}}}
 print(doca:select('a/b[a1=r]/'):drop()) --> {"lom"}
 print(doca:select('a/b[a1=r]'):drop())  --> {{"lom", ["."] = "b", ["@"] = {a1 = "r"}}}
-print(docb:drop())
--->
+
+print(doca:drop()) -->
+{
+    {
+        {"we", ["."] = "b"},
+        {["."] = "c"},
+        {["."] = "d"},
+        {{ {"lom", ["."] = "b", ["@"] = {a1 = "r"}}, ["."] = "a"}, ["."] = "e"},
+        {"us", ["."] = "b"},
+        ["."] = "a"
+    }
+}
+print(docb:drop()) -->
 {
     {
         {["."] = "aa"},
         {
-            ["&"] = {{"we", ["."] = "b"}, {"us", ["."] = "b"}, {"lom", ["."] = "b", ["@"] = {a1 = "r"}}, 0 = 0.84018771676347},
+            ["&"] = {{"we", ["."] = "b"}, {"us", ["."] = "b"}, {"lom", ["."] = "b", ["@"] = {a1 = "r"}}, [0] = 0.84018771676347},
             ["."] = "c",
             ["@"] = {["xlink:href"] = "a.xml#xpointer(a/b)"}
         },
         {
-            ["&"] = {"we", "us", 0 = 0.84018771676347},
+            ["&"] = {"we", "us", ["."] = "b", [0] = 0.84018771676347},
             ["."] = "d",
             ["@"] = {["xlink:href"] = "a.xml#xpointer(/a/b/)"}
         },
@@ -247,8 +258,14 @@ print(we.var2str(a))
 
 a.b = a
 print(we.var2str(a, true)) -- safe mode
-table0x5590a12caeb0 = {a = 1}
-table0x5590a12caeb0.b = table0x5590a12caeb0
+-->
+    table0x5590a12caeb0 = {a = 1}
+    table0x5590a12caeb0.b = table0x5590a12caeb0
+
+print(we.var2str(a, 'a', {safe = true})) -- name with safe mode
+-->
+    a = {a = 1}
+    a.b = a
 ```
 
 ## XmlObject.lua
