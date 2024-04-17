@@ -179,7 +179,7 @@ local function xPath (c, paths, doc, conti) -- {{{ return doc/xml-node table, en
     end
     -- not final: break to further search
     if #xn > 0 and (2 * c) ~= #paths and tag ~= '' then
-        local nxn = {}
+        local nxn = {['.'] = xn[1]['.'], ['@'] = xn[1]['@']}
         for i = 1, #xn do
             local mt = xn[i]
             for j = 1, #mt do tinsert(nxn, mt[j]) end
