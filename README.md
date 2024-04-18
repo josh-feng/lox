@@ -186,21 +186,22 @@ Lox's dom sometimes has a tag link entry, which is a table and contains entry `[
 </b>
 ```
 
-The `select` method is demonstrated in the following various cases:
+The `select` method is demonstrated in the following various cases,
+and a shorter form of is shown in the last case:
 
 ```lua
 lom = require('lom')
 doca = lom('a.xml')
 docb = lom('b.xml')
 lom(true)
-print(doca:select('/a/b/'):drop())      --> {"we", "us", ["."] = "b"}
 print(doca:select('/a/b'):drop())       --> {{"we", ["."] = "b"}, {"us", ["."] = "b"}}
-print(doca:select('a/b/'):drop())       --> {"we", "us", "lom", ["."] = "b"}
+print(doca:select('/a/b/'):drop())      --> {"we", "us", ["."] = "b"}
 print(doca:select('a/b'):drop())        --> {{"we", ["."] = "b"}, {"us", ["."] = "b"}, {"lom", ["."] = "b", ["@"] = {a1 = "r"}}}
-print(doca:select('a/b[a1=r]/'):drop()) --> {"lom"}
+print(doca:select('a/b/'):drop())       --> {"we", "us", "lom", ["."] = "b", ["@"] = {a1 = "r"}}
 print(doca:select('a/b[a1=r]'):drop())  --> {{"lom", ["."] = "b", ["@"] = {a1 = "r"}}}
-
-print(doca:drop()) -->
+print(doca:select('a/b[a1=r]/'):drop()) --> {"lom", ["."] = "b", ["@"] = {a1 = "r"}}
+print(doca:drop())
+--[[
 {
     {
         {"we", ["."] = "b"},
@@ -211,7 +212,9 @@ print(doca:drop()) -->
         ["."] = "a"
     }
 }
-print(docb:drop()) -->
+--]]
+print(docb:drop())
+--[[
 {
     {
         {["."] = "aa"},
@@ -221,13 +224,50 @@ print(docb:drop()) -->
             ["@"] = {["xlink:href"] = "a.xml#xpointer(a/b)"}
         },
         {
-            ["&"] = {"we", "us", ["."] = "b", [0] = 0.84018771676347},
+            ["&"] = {
+                {"we", ["."] = "b"},
+                {["."] = "c"},
+                {["."] = "d"},
+                {{ {"lom", ["."] = "b", ["@"] = {a1 = "r"}}, ["."] = "a"}, ["."] = "e"},
+                {"us", ["."] = "b"},
+                ["."] = "a",
+                [0] = 0.84018771676347
+            },
             ["."] = "d",
-            ["@"] = {["xlink:href"] = "a.xml#xpointer(/a/b/)"}
+            ["@"] = {["xlink:href"] = "a.xml#xpointer(/a/)"}
         },
         ["."] = "b"
     }
 }
+--]]
+print(docb:select('b/c'):drop())
+--[[
+{
+    {
+        ["&"] = {{"we", ["."] = "b"}, {"us", ["."] = "b"}, {"lom", ["."] = "b", ["@"] = {a1 = "r"}}, [0] = 0.84018771676347},
+        ["."] = "c",
+        ["@"] = {["xlink:href"] = "a.xml#xpointer(a/b)"}
+    }
+}
+--]]
+print(docb('b/d'):drop()) --> {["."] = "c", ["@"] = {["xlink:href"] = "a.xml#xpointer(a/b)"}}
+--[[
+{
+    {
+        ["&"] = {
+            {"we", ["."] = "b"},
+            {["."] = "c"},
+            {["."] = "d"},
+            {{ {"lom", ["."] = "b", ["@"] = {a1 = "r"}}, ["."] = "a"}, ["."] = "e"},
+            {"us", ["."] = "b"},
+            ["."] = "a",
+            [0] = 0.84018771676347
+        },
+        ["."] = "d",
+        ["@"] = {["xlink:href"] = "a.xml#xpointer(/a/)"}
+    }
+}
+--]]
 ```
 
 
@@ -254,7 +294,8 @@ we = require('us') -- working environments
 
 a = {a = 1}
 print(we.var2str(a))
-{a = 1}
+--> 
+    {a = 1}
 
 a.b = a
 print(we.var2str(a, true)) -- safe mode
