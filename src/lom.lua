@@ -123,7 +123,9 @@ local function xPath (c, paths, doc, conti) -- {{{ return doc/xml-node table, en
     local path = paths[2 * c - 1]
     if (not path) or path == '/' or path == '' or #doc == 0 then
         if conti and #conti > 0 then
-            for _, v in ipairs(xPath(1, paths, conti)) do tinsert(doc, v) end
+            local mt = xPath(1, paths, conti)
+            for _, v in ipairs(mt) do tinsert(doc, v) end
+            doc['.'], doc['@'] = doc['.'] or mt['.'], doc['@'] or mt['@']
         end
         return doc, c
     end
@@ -336,7 +338,10 @@ local dom = class { -- lua document object model {{{
     ['>'] = function (o) for i = 0, #o do o[i] = nil end end;
 
     ['^'] = {
-        __call = function (o) return setmetatable(we.dup(o), getmetatable(o)) end;
+        __call = function (o, path)
+            if type(path) == 'string' then return o:select(path) end
+            return setmetatable(we.dup(o), getmetatable(o))
+        end;
     };
 
     parse = false; -- implemented in friend function
