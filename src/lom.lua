@@ -276,6 +276,27 @@ local function wXml (node) -- {{{
     return strgsub(tconcat(res, '\n'), '\n', '\n  ')..'\n</'..node['.']..'>' -- indent 2
 end -- }}}
 
+local function dom2tbl (t, f) -- to a simple table: f is a map or detect {{{
+    local leaf = true
+    local val = {}
+    for _, e in ipairs(t) do
+        if type(e) == 'table' and ((not f) or f(e)) then
+            leaf = false
+            local v, k = dom2tbl(e)
+            if val[k] then
+                if type(val[k]) ~= 'table' then val[k] = {val[k]} end
+                if type(v) ~= 'table' then tinsert(val[k], v)
+                else for i = 1, #v do tinsert(val[k], v[i]) end end
+            else
+                val[k] = v
+            end
+        else
+            tinsert(val, e)
+        end
+    end
+    return leaf and tconcat(val, '\n') or val, t['.']
+end -- }}}
+
 local dom = class { -- lua document object model {{{
     ['.'] = false; -- tag name
     ['@'] = false; -- attr
@@ -285,7 +306,6 @@ local dom = class { -- lua document object model {{{
     ['+'] = false; -- misc info (definition/declaration)
 
     ['<'] = function (o, spec, mode) --{{{
-
         mode = tonumber(mode) or 0x0f
         -- 0x40 extension: <?php ?> <%= %>
         -- 0x20 keep comment
@@ -340,7 +360,8 @@ local dom = class { -- lua document object model {{{
     ['^'] = {
         __call = function (o, path)
             if type(path) == 'string' then return o:select(path) end
-            return setmetatable(we.dup(o), getmetatable(o))
+            local value, key = dom2tbl(o, type(path) == 'function' and path)
+            return key and {key = value} or value
         end;
     };
 
