@@ -11,9 +11,7 @@ a simple/sloppy markup language parser (*tag soup parser*) for an expat replacem
 More info will be added to the [wiki page](https://github.com/josh-feng/lox/wiki/LOX-(Lua-Object-model-for-X-html))
 
 
-A quick example:
-
-For the following file `example.xml`
+A quick example for the following file `example.xml`
 
 ```html
 <tag>
@@ -48,7 +46,7 @@ lox will convert it as a lua table (doc):
 
 
 - `['.']` entry assigns the tag name.
-- Subnodes and elements are placed consecutively in the table.
+- Subnodes (elements) are placed consecutively in the table.
 - The comment text will be prefixed with `\0` character.
 - Attributes are recorded in `['@']` entry; however, their order is ignored.
 
@@ -76,7 +74,7 @@ lom = require('lom')
 
 doc1 = lom('/path/to/file.html') -- doc object
 
-doc2 = lom('')                   -- text/data are supplied to parser
+doc2 = lom('')                   -- text/data are supplied to parser consecutively
 doc2:parse(xmltxt_1)
 -- ...
 doc2:parse(xmltxt_n):parse()     -- final call to close the parsing
@@ -250,7 +248,7 @@ print(docb:select('b/c'):drop())
     }
 }
 --]]
-print(docb('b/d'):drop()) --> {["."] = "c", ["@"] = {["xlink:href"] = "a.xml#xpointer(a/b)"}}
+print(docb('b/d'):drop())
 --[[
 {
     {
@@ -268,7 +266,15 @@ print(docb('b/d'):drop()) --> {["."] = "c", ["@"] = {["xlink:href"] = "a.xml#xpo
     }
 }
 --]]
+
+we = require('us')
+print(we.var2str(doca()))         --> {a = {b = {"we", "us"}, c = "", d = "", e = {a = {b = "lom"}}}}
+print(we.var2str(docb('b/d')()))  --> {d = ""}
 ```
+
+As shown in the last two commands,
+besides the short form for `select`, calling the doc object without any argument will
+return a converted *simplified* lua table, with convention key/value pair.
 
 
 ## lsmp.so (lua sloppy markup parser)
@@ -285,7 +291,8 @@ Please modify `makefile` based on your system.
 
 ## us.lua
 
-Useful Stuff module can print out a table value.
+Useful Stuff module contains a funciton `var2str` to print out a table value,
+which is *useful* for debugging.
 To make sure self-referenced table is well treated,
 we turn on the safe mode:
 
@@ -294,7 +301,7 @@ we = require('us') -- working environments
 
 a = {a = 1}
 print(we.var2str(a))
---> 
+-->
     {a = 1}
 
 a.b = a
