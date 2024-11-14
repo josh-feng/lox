@@ -214,29 +214,18 @@ we.tbl2str = function (tbl, sep) -- {{{ build the set
     return tconcat(res, sep or ',')
 end -- }}}
 
-we.str2tbl = function (txt) -- {{{ -- build the tmpl from string
-    local res = {}
-    local var
-    while txt ~= '' do
-        var, txt = strmatch(strsub(txt, 2, #txt), '^([_%w]*)(.*)$')
-        local c = strsub(txt, 1, 1)
-        if tonumber(var) then
-            tinsert(res, tonumber(var))
-        elseif c == ',' then -- sep
-            txt = strsub(txt, 2, #txt)
-            res[var] = true
-        elseif c == '=' then -- set (NB: '/" ...)
-            c = strsub(txt, 2, 2)
-            if c == '"' or c == "'" then
-                c, txt = strmatch(strsub(txt, 3, #txt), '^([^'..c..']*)'..c..'(.*)$')
-                if not c then error('Wrong var quote', 2) end
-                res[var] = c
-            else
-                c, txt = strmatch(strsub(txt, 2, #txt), '^([^,%]]*)(.*)$')
-                res[var] = c
-            end
+we.str2tbl = function (txt, sep) -- {{{ -- build the tmpl from string
+    local res = we.split(txt, type(sep) == 'string' and sep or ',')
+    local c = 1
+    for i, v in ipairs(res) do
+        local var, val = strmatch(v, '^([^=]*)=(.*)$')
+        res[i] = nil
+        if var then
+            var, val = we.trimq(var), we.trimq(val)
+            res[var] = tonumber(val) or val
         else
-            error('Wrong var setting: '..var..':'..txt, 2)
+            res[c] = tonumber(v) or v
+            c = c + 1
         end
     end
     return res
