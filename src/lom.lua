@@ -284,15 +284,23 @@ local function dom2tbl (t, f) -- to a simple table: f is a map or detect {{{
             leaf = false
             local v, k = dom2tbl(e)
             if val[k] then
-                if type(val[k]) ~= 'table' then val[k] = {val[k]} end
-                if type(v) ~= 'table' then tinsert(val[k], v)
-                else for i = 1, #v do tinsert(val[k], v[i]) end end
+                if type(val[k]) ~= 'table' or not val[k]['*'] then
+                    val[k] = {val[k], v}
+                else
+                    tinsert(val[k], v)
+                end
+                if type(v) == 'table' then val[k]['*'] = true end
             else
                 val[k] = v
             end
         else
             tinsert(val, e)
         end
+    end
+    for _, v in pairs(val) do if type(v) == 'table' then v['*'] = nil end end
+    if type(t['@']) == 'table' then
+        val['@'] = t['@']
+        leaf = false
     end
     return leaf and tconcat(val, '\n') or val, t['.']
 end -- }}}
@@ -466,7 +474,7 @@ local lom = setmetatable({}, {
         elseif type(spec) ~= 'table' then -- closing
             return buildxlink() -- error message table
         end
-        return dom(spec, mode)
+        return dom(spec, mode) -- or class:cast(spec, dom)
     end; -- }}}
     __index = {
         doc = docs;
