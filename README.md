@@ -188,7 +188,9 @@ The `select` method is demonstrated in the following various cases,
 and a shorter form of is shown in the last case:
 
 ```lua
+#!/bin/env lua
 lom = require('lom')
+
 doca = lom('a.xml')
 docb = lom('b.xml')
 lom(true)
@@ -205,7 +207,7 @@ print(doca:drop())
         {"we", ["."] = "b"},
         {["."] = "c"},
         {["."] = "d"},
-        {{ {"lom", ["."] = "b", ["@"] = {a1 = "r"}}, ["."] = "a"}, ["."] = "e"},
+        {{{"lom", ["."] = "b", ["@"] = {a1 = "r"}}, ["."] = "a"}, ["."] = "e"},
         {"us", ["."] = "b"},
         ["."] = "a"
     }
@@ -226,7 +228,7 @@ print(docb:drop())
                 {"we", ["."] = "b"},
                 {["."] = "c"},
                 {["."] = "d"},
-                {{ {"lom", ["."] = "b", ["@"] = {a1 = "r"}}, ["."] = "a"}, ["."] = "e"},
+                {{{"lom", ["."] = "b", ["@"] = {a1 = "r"}}, ["."] = "a"}, ["."] = "e"},
                 {"us", ["."] = "b"},
                 ["."] = "a",
                 [0] = 0.84018771676347
@@ -256,7 +258,7 @@ print(docb('b/d'):drop())
             {"we", ["."] = "b"},
             {["."] = "c"},
             {["."] = "d"},
-            {{ {"lom", ["."] = "b", ["@"] = {a1 = "r"}}, ["."] = "a"}, ["."] = "e"},
+            {{{"lom", ["."] = "b", ["@"] = {a1 = "r"}}, ["."] = "a"}, ["."] = "e"},
             {"us", ["."] = "b"},
             ["."] = "a",
             [0] = 0.84018771676347
@@ -268,13 +270,51 @@ print(docb('b/d'):drop())
 --]]
 
 we = require('us')
-print(we.var2str(doca()))         --> {a = {b = {"we", "us"}, c = "", d = "", e = {a = {b = "lom"}}}}
-print(we.var2str(docb('b/d')()))  --> {d = ""}
+print(we.var2str(doca()))         --> {a = {b = {"we", "us"}, c = "", d = "", e = {a = {b = {"lom", ["@"] = {a1 = "r"}}}}}}
+print(we.var2str(docb('b/d')()))  --> {d = {["@"] = {["xlink:href"] = "a.xml#xpointer(/a/)"}}}
+
 ```
 
 As shown in the last two commands,
 besides the short form for `select`, calling the doc object without any argument will
 return a converted *simplified* lua table, with convention key/value pair.
+Further example is shown below for `c.html`
+
+```html
+<a>
+  <c s=1>
+    <b>text1</b>
+    <b>text1</b>
+  </c>
+  text4
+  <c>
+    <b>text3</b>
+    <b u=3>text3</b>
+  </c>
+  text5
+</a>
+<a t=2>
+  <b>text2</b>
+</a>
+```
+
+and its simplified table:
+
+```lua
+docc = lom('c.xml')
+print(we.var2str(docc()))
+--[[
+{
+    a = {
+        {
+            "   text4", "   text5",
+            c = {{["@"] = {s = "1"}, b = {"text1", "text1"}}, {b = {"text3", {"text3", ["@"] = {u = "3"}}}}}
+        },
+        {["@"] = {t = "2"}, b = "text2"}
+    }
+}
+--]]
+```
 
 
 ## lsmp.so (lua sloppy markup parser)
