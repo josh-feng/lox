@@ -349,6 +349,7 @@ enum MPState SML_Parse (SML_Parser p, const char *s, int len) {
               }
               else { /* <*> */
                 p->mode |= F_TOKEN;
+                if (*(c - 1) == '/') c--; // FIX <*/>
                 p->elem = strndup(s, c - s);
                 DBG(1, printf("TOKEN2 (%s)%x\n", p->elem, p->mode););
               }
