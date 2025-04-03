@@ -280,7 +280,7 @@ local function dom2tbl (t, f) -- to a simple table: f is a map or detect {{{
     local leaf = true
     local val = {}
     for _, e in ipairs(t) do
-        if type(e) == 'table' and ((not f) or f(e)) then
+        if type(e) == 'table' and ((not f) or f(e, t, _)) then
             leaf = false
             local v, k = dom2tbl(e)
             if val[k] then
